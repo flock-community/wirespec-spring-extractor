@@ -11,13 +11,13 @@ object ClasspathBuilder {
         URLClassLoader(urls.toTypedArray(), parent)
 
     /**
-     * Combine `outputDirectory` with the runtime classpath into the URL list
-     * to feed a URLClassLoader. The output dir comes first so the project's
-     * own classes win over duplicates pulled in transitively.
+     * Combine class output directories with the runtime classpath into the
+     * URL list to feed a URLClassLoader. The output dirs come first (in order)
+     * so the project's own classes win over duplicates pulled in transitively.
      */
-    fun collectUrls(runtimeClasspathElements: List<String>, outputDirectory: File): List<URL> {
-        val output = outputDirectory.toURI().toURL()
+    fun collectUrls(runtimeClasspathElements: List<String>, outputDirectories: List<File>): List<URL> {
+        val outputs = outputDirectories.map { it.toURI().toURL() }
         val deps = runtimeClasspathElements.map { File(it).toURI().toURL() }
-        return (listOf(output) + deps).distinct()
+        return (outputs + deps).distinct()
     }
 }

@@ -41,7 +41,7 @@ class ExtractMojo : AbstractMojo() {
         try {
             WirespecExtractor.extract(
                 ExtractConfig(
-                    classesDirectory = File(project.build.outputDirectory),
+                    classesDirectories = listOf(File(project.build.outputDirectory)),
                     runtimeClasspath = runtimeClasspath,
                     outputDirectory = output,
                     basePackage = basePackage,

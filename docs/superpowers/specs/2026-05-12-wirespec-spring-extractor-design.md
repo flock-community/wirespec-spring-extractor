@@ -193,7 +193,9 @@ Wraps Wirespec's built-in emitter to render the AST.
 
 - **Layout:** one `.ws` per controller (file name = simple class name) +
   one shared `types.ws` for all referenced DTOs.
-- Wirespec `import` statements link the per-controller files to `types.ws`.
+- No import syntax is needed — Wirespec resolves type references globally by
+  name across all `.ws` files in the compilation set, so endpoints in
+  per-controller files automatically resolve types defined in `types.ws`.
 
 ## File writer behavior
 

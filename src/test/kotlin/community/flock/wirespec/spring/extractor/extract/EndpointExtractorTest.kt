@@ -9,6 +9,7 @@ import community.flock.wirespec.spring.extractor.model.Endpoint.HttpMethod
 import community.flock.wirespec.spring.extractor.model.Endpoint.PathSegment
 import community.flock.wirespec.spring.extractor.model.WireType
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -33,6 +34,14 @@ class EndpointExtractorTest {
         methods shouldContain HttpMethod.GET
         methods shouldContain HttpMethod.HEAD
         methods shouldHaveSize 2
+    }
+
+    @Test
+    fun `multi-method mapping produces endpoints with unique names`() {
+        val endpoints = EndpointExtractor(TypeExtractor()).extract(MultiMappingController::class.java)
+        val names = endpoints.map { it.name }
+        names.distinct() shouldBe names  // all unique
+        names shouldContainExactlyInAnyOrder listOf("BothGet", "BothHead")
     }
 
     @Test

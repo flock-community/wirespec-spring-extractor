@@ -36,12 +36,19 @@ class EndpointExtractor(private val types: TypeExtractor) {
         }
         val status = ReturnTypeUnwrapper.statusCodeFor(method, unwrapped)
 
+        val needsMethodSuffix = httpMethods.size > 1
+        val needsPathSuffix = methodPaths.size > 1
+
         return httpMethods.flatMap { rm ->
             classPaths.flatMap { cp ->
-                methodPaths.map { mp ->
+                methodPaths.mapIndexed { pathIdx, mp ->
+                    val baseName = pascalCase(method.name)
+                    val name = baseName +
+                        (if (needsMethodSuffix) rm.name.lowercase().replaceFirstChar { it.uppercase() } else "") +
+                        (if (needsPathSuffix) (pathIdx + 1).toString() else "")
                     Endpoint(
                         controllerSimpleName = controllerClass.simpleName,
-                        name = pascalCase(method.name),
+                        name = name,
                         method = rm.toHttpMethod(),
                         pathSegments = parsePath(joinPath(cp, mp)),
                         queryParams = allParams.filter { it.source == Param.Source.QUERY },

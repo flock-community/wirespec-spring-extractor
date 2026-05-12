@@ -1,5 +1,8 @@
 # wirespec-spring-extractor
 
+[![Maven Central](https://img.shields.io/maven-central/v/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin?label=maven-plugin)](https://central.sonatype.com/artifact/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin)
+[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/community.flock.wirespec.spring.extractor?label=gradle-plugin)](https://plugins.gradle.org/plugin/community.flock.wirespec.spring.extractor)
+
 A Maven and Gradle plugin that scans a Spring Boot application's compiled classes and emits
 [Wirespec](https://wirespec.io) (`.ws`) files describing its HTTP endpoints and DTO types.
 

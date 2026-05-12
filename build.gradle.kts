@@ -46,7 +46,15 @@ subprojects {
         // would defer publication creation past that lookup → "task not found".
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
             configureBasedOnAppliedPlugins()
-            publishToMavenCentral(automaticRelease = true)
+            // vanniktech 0.30.0 defaults `host` to SonatypeHost.DEFAULT
+            // (https://oss.sonatype.org — legacy Nexus 2). Our Sonatype account
+            // exists only on the new Central Portal (central.sonatype.com), so
+            // we must pass CENTRAL_PORTAL explicitly — otherwise the publish
+            // task hits the legacy staging API and gets 402 Payment Required.
+            publishToMavenCentral(
+                com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL,
+                automaticRelease = true,
+            )
             signAllPublications()
 
             coordinates(

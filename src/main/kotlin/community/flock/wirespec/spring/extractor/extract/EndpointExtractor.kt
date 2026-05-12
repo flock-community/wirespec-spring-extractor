@@ -36,6 +36,9 @@ object EndpointExtractor {
         val methodPaths = mapping.path.toList().takeIf { it.isNotEmpty() } ?: listOf("")
         val httpMethods = if (mapping.method.isEmpty()) listOf(RequestMethod.GET) else mapping.method.toList()
 
+        val allParams = ParamExtractor.extractParams(method)
+        val bodyParam = ParamExtractor.extractRequestBodyParameter(method)
+
         return httpMethods.flatMap { rm ->
             classPaths.flatMap { cp ->
                 methodPaths.map { mp ->
@@ -44,10 +47,13 @@ object EndpointExtractor {
                         name = pascalCase(method.name),
                         method = rm.toHttpMethod(),
                         pathSegments = parsePath(joinPath(cp, mp)),
-                        queryParams = emptyList(),    // Task 6
-                        headerParams = emptyList(),   // Task 6
-                        cookieParams = emptyList(),   // Task 6
-                        requestBody = null,           // Task 6
+                        queryParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.QUERY },
+                        headerParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.HEADER },
+                        cookieParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.COOKIE },
+                        requestBody = bodyParam?.let { _ ->
+                            // Real type resolution comes in Task 8.
+                            community.flock.wirespec.spring.extractor.model.WireType.Ref("Unknown")
+                        },
                         responseBody = null,          // Task 7
                         statusCode = 200,             // Task 7
                     )

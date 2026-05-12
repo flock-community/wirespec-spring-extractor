@@ -49,4 +49,12 @@ class EndpointExtractorTest {
         val ep = EndpointExtractor.extract(HelloController::class.java).single()
         ep.name shouldBe "Hello"
     }
+
+    @Test
+    fun `params and body propagate from ParamExtractor`() {
+        val ep = community.flock.wirespec.spring.extractor.extract.EndpointExtractor
+            .extract(community.flock.wirespec.spring.extractor.fixtures.ParamsController::class.java)
+            .single { it.name == "PostItem" }
+        ep.requestBody shouldBe community.flock.wirespec.spring.extractor.model.WireType.Ref("Unknown")
+    }
 }

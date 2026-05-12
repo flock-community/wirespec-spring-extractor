@@ -158,6 +158,9 @@
                 </executions>
                 <configuration>
                     <jvmTarget>21</jvmTarget>
+                    <args>
+                        <arg>-java-parameters</arg>
+                    </args>
                 </configuration>
             </plugin>
 

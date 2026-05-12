@@ -4,8 +4,10 @@ package community.flock.wirespec.spring.extractor.extract
 import community.flock.wirespec.spring.extractor.fixtures.HelloController
 import community.flock.wirespec.spring.extractor.fixtures.InheritingController
 import community.flock.wirespec.spring.extractor.fixtures.MultiMappingController
+import community.flock.wirespec.spring.extractor.fixtures.ParamsController
 import community.flock.wirespec.spring.extractor.model.Endpoint.HttpMethod
 import community.flock.wirespec.spring.extractor.model.Endpoint.PathSegment
+import community.flock.wirespec.spring.extractor.model.WireType
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -15,7 +17,7 @@ class EndpointExtractorTest {
 
     @Test
     fun `combines class-level and method-level paths`() {
-        val endpoints = EndpointExtractor.extract(HelloController::class.java)
+        val endpoints = EndpointExtractor(TypeExtractor()).extract(HelloController::class.java)
 
         endpoints shouldHaveSize 1
         val ep = endpoints.single()
@@ -26,7 +28,7 @@ class EndpointExtractorTest {
 
     @Test
     fun `multi-method mapping produces one endpoint per method`() {
-        val methods = EndpointExtractor.extract(MultiMappingController::class.java).map { it.method }
+        val methods = EndpointExtractor(TypeExtractor()).extract(MultiMappingController::class.java).map { it.method }
 
         methods shouldContain HttpMethod.GET
         methods shouldContain HttpMethod.HEAD
@@ -35,7 +37,7 @@ class EndpointExtractorTest {
 
     @Test
     fun `honors inherited @RequestMapping from a superclass`() {
-        val endpoints = EndpointExtractor.extract(InheritingController::class.java)
+        val endpoints = EndpointExtractor(TypeExtractor()).extract(InheritingController::class.java)
 
         endpoints shouldHaveSize 1
         endpoints.single().pathSegments shouldBe listOf(
@@ -46,15 +48,15 @@ class EndpointExtractorTest {
 
     @Test
     fun `endpoint name is PascalCase of method name`() {
-        val ep = EndpointExtractor.extract(HelloController::class.java).single()
+        val ep = EndpointExtractor(TypeExtractor()).extract(HelloController::class.java).single()
         ep.name shouldBe "Hello"
     }
 
     @Test
     fun `params and body propagate from ParamExtractor`() {
-        val ep = community.flock.wirespec.spring.extractor.extract.EndpointExtractor
-            .extract(community.flock.wirespec.spring.extractor.fixtures.ParamsController::class.java)
+        val ep = EndpointExtractor(TypeExtractor())
+            .extract(ParamsController::class.java)
             .single { it.name == "PostItem" }
-        ep.requestBody shouldBe community.flock.wirespec.spring.extractor.model.WireType.Ref("Unknown")
+        ep.requestBody shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
     }
 }

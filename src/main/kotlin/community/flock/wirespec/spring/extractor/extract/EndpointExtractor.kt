@@ -4,49 +4,37 @@ package community.flock.wirespec.spring.extractor.extract
 import community.flock.wirespec.spring.extractor.model.Endpoint
 import community.flock.wirespec.spring.extractor.model.Endpoint.HttpMethod
 import community.flock.wirespec.spring.extractor.model.Endpoint.PathSegment
+import community.flock.wirespec.spring.extractor.model.Param
+import community.flock.wirespec.spring.extractor.model.WireType
 import org.springframework.core.annotation.AnnotatedElementUtils
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestMethod
 import java.lang.reflect.Method
 
-object EndpointExtractor {
+class EndpointExtractor(private val types: TypeExtractor) {
 
-    /**
-     * Extract all Wirespec endpoints from one Spring controller class.
-     * Parameter, body and return-type extraction are stubs in this task —
-     * they're filled in by Tasks 6 and 7.
-     */
+    private val params = ParamExtractor(types)
+
     fun extract(controllerClass: Class<*>): List<Endpoint> {
         val classMapping = AnnotatedElementUtils.findMergedAnnotation(controllerClass, RequestMapping::class.java)
         val classPaths = classMapping?.path?.toList()?.takeIf { it.isNotEmpty() } ?: listOf("")
-
-        return controllerClass.methods.flatMap { method ->
-            extractFromMethod(controllerClass, classPaths, method)
-        }
+        return controllerClass.methods.flatMap { method -> extractFromMethod(controllerClass, classPaths, method) }
     }
 
-    private fun extractFromMethod(
-        controllerClass: Class<*>,
-        classPaths: List<String>,
-        method: Method,
-    ): List<Endpoint> {
+    private fun extractFromMethod(controllerClass: Class<*>, classPaths: List<String>, method: Method): List<Endpoint> {
         val mapping = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping::class.java)
             ?: return emptyList()
-
         val methodPaths = mapping.path.toList().takeIf { it.isNotEmpty() } ?: listOf("")
         val httpMethods = if (mapping.method.isEmpty()) listOf(RequestMethod.GET) else mapping.method.toList()
 
-        val allParams = ParamExtractor.extractParams(method)
-        val bodyParam = ParamExtractor.extractRequestBodyParameter(method)
-
+        val allParams = params.extractParams(method)
+        val body = params.extractRequestBody(method)
         val unwrapped = ReturnTypeUnwrapper.unwrap(method.genericReturnType)
-        val responseRef = if (unwrapped.isVoid) null
-            else community.flock.wirespec.spring.extractor.model.WireType.Ref(
-                (unwrapped.type as? Class<*>)?.simpleName ?: "Unknown"
-            ).let { ref ->
-                if (unwrapped.isList) community.flock.wirespec.spring.extractor.model.WireType.ListOf(ref)
-                else ref
-            }
+        val responseRef = if (unwrapped.isVoid) null else {
+            val raw = types.extract(unwrapped.type)
+            if (unwrapped.isList) WireType.ListOf(raw) else raw
+        }
+        val status = ReturnTypeUnwrapper.statusCodeFor(method, unwrapped)
 
         return httpMethods.flatMap { rm ->
             classPaths.flatMap { cp ->
@@ -56,15 +44,12 @@ object EndpointExtractor {
                         name = pascalCase(method.name),
                         method = rm.toHttpMethod(),
                         pathSegments = parsePath(joinPath(cp, mp)),
-                        queryParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.QUERY },
-                        headerParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.HEADER },
-                        cookieParams = allParams.filter { it.source == community.flock.wirespec.spring.extractor.model.Param.Source.COOKIE },
-                        requestBody = bodyParam?.let { _ ->
-                            // Real type resolution comes in Task 8.
-                            community.flock.wirespec.spring.extractor.model.WireType.Ref("Unknown")
-                        },
+                        queryParams = allParams.filter { it.source == Param.Source.QUERY },
+                        headerParams = allParams.filter { it.source == Param.Source.HEADER },
+                        cookieParams = allParams.filter { it.source == Param.Source.COOKIE },
+                        requestBody = body,
                         responseBody = responseRef,
-                        statusCode = ReturnTypeUnwrapper.statusCodeFor(method, unwrapped),
+                        statusCode = status,
                     )
                 }
             }
@@ -80,16 +65,8 @@ object EndpointExtractor {
     internal fun parsePath(path: String): List<PathSegment> =
         path.split('/').filter { it.isNotBlank() }.map { seg ->
             val match = Regex("""^\{([^:}]+)(?::[^}]+)?}$""").matchEntire(seg)
-            if (match != null) {
-                PathSegment.Variable(
-                    name = match.groupValues[1],
-                    type = community.flock.wirespec.spring.extractor.model.WireType.Primitive(
-                        community.flock.wirespec.spring.extractor.model.WireType.Primitive.Kind.STRING,
-                    ),
-                )
-            } else {
-                PathSegment.Literal(seg)
-            }
+            if (match != null) PathSegment.Variable(match.groupValues[1], WireType.Primitive(WireType.Primitive.Kind.STRING))
+            else PathSegment.Literal(seg)
         }
 
     internal fun pascalCase(name: String): String =

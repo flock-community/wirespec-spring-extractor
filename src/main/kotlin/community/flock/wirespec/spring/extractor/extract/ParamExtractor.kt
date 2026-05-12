@@ -12,35 +12,29 @@ import org.springframework.web.bind.annotation.RequestParam
 import java.lang.reflect.Method
 import java.lang.reflect.Parameter
 
-object ParamExtractor {
+class ParamExtractor(private val types: TypeExtractor) {
 
-    /** Extract all non-body parameters of [method]. */
-    fun extractParams(method: Method): List<Param> =
-        method.parameters.mapNotNull(::toParam)
+    fun extractParams(method: Method): List<Param> = method.parameters.mapNotNull(::toParam)
 
-    /** Find the first @RequestBody parameter, if any. */
-    fun extractRequestBodyParameter(method: Method): Parameter? =
-        method.parameters.firstOrNull { it.isAnnotationPresent(RequestBody::class.java) }
-
-    private fun toParam(p: Parameter): Param? {
-        p.getAnnotation(PathVariable::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { p.name }, source = Source.PATH, type = stringPlaceholder())
-        }
-        p.getAnnotation(RequestParam::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { p.name }, source = Source.QUERY, type = stringPlaceholder())
-        }
-        p.getAnnotation(RequestHeader::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { p.name }, source = Source.HEADER, type = stringPlaceholder())
-        }
-        p.getAnnotation(CookieValue::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { p.name }, source = Source.COOKIE, type = stringPlaceholder())
-        }
-        return null  // unannotated parameters and @RequestBody are skipped here
+    fun extractRequestBody(method: Method): WireType? {
+        val p = method.parameters.firstOrNull { it.isAnnotationPresent(RequestBody::class.java) } ?: return null
+        return types.extract(p.parameterizedType)
     }
 
-    /**
-     * Placeholder type. Task 8 (TypeExtractor) replaces this with real type
-     * resolution by passing in a TypeExtractor instance.
-     */
-    private fun stringPlaceholder() = WireType.Primitive(WireType.Primitive.Kind.STRING)
+    private fun toParam(p: Parameter): Param? {
+        val type = types.extract(p.parameterizedType)
+        p.getAnnotation(PathVariable::class.java)?.let { a ->
+            return Param(name = a.value.ifEmpty { p.name }, source = Source.PATH, type = type)
+        }
+        p.getAnnotation(RequestParam::class.java)?.let { a ->
+            return Param(name = a.value.ifEmpty { p.name }, source = Source.QUERY, type = type)
+        }
+        p.getAnnotation(RequestHeader::class.java)?.let { a ->
+            return Param(name = a.value.ifEmpty { p.name }, source = Source.HEADER, type = type)
+        }
+        p.getAnnotation(CookieValue::class.java)?.let { a ->
+            return Param(name = a.value.ifEmpty { p.name }, source = Source.COOKIE, type = type)
+        }
+        return null
+    }
 }

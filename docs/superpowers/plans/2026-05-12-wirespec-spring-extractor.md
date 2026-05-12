@@ -177,18 +177,18 @@ wirespec-spring-extractor/
             <version>${wirespec.version}</version>
         </dependency>
 
-        <!-- Spring annotations (test scope) -->
+        <!-- Spring (compile scope — EndpointExtractor uses AnnotatedElementUtils
+             at plugin runtime, and Maven plugins don't get a 'provided' classpath
+             from the host project) -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
             <version>${spring.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
             <version>${spring.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

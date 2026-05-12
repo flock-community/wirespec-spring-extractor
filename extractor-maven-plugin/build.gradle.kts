@@ -20,6 +20,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.maven.plugin.development)
     `maven-publish`
+    alias(libs.plugins.vanniktech.maven.publish.base)
 }
 
 description = "Extracts Spring Boot endpoints into Wirespec .ws files."
@@ -145,20 +146,6 @@ tasks.named<Jar>("jar") {
 }
 
 publishing {
-    publications {
-        // Single Maven publication of the plugin jar, with the corrected
-        // artifactId (project name is `plugin/`, but we publish under the
-        // descriptive Maven coordinate).
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            artifactId = "wirespec-spring-extractor-maven-plugin"
-            pom {
-                name.set("Wirespec Spring Extractor Maven Plugin")
-                description.set(project.description)
-                packaging = "maven-plugin"
-            }
-        }
-    }
     repositories {
         // Build-local repo used by the :integration-tests-maven module. Publishing
         // here keeps the fixture Maven builds isolated from the user's ~/.m2.

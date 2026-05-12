@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     `maven-publish`
+    alias(libs.plugins.vanniktech.maven.publish.base)
 }
 
 description = "Spring → Wirespec extraction logic. Maven-agnostic; drives the Maven plugin."
@@ -40,16 +41,6 @@ tasks.test {
 }
 
 publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            artifactId = "wirespec-spring-extractor-core"
-            pom {
-                name.set("Wirespec Spring Extractor Core")
-                description.set(project.description)
-            }
-        }
-    }
     repositories {
         // Same build-local repo as the Maven plugin: integration tests can
         // resolve both artifacts from one place.

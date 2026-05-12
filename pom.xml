@@ -84,18 +84,16 @@
             <version>${wirespec.version}</version>
         </dependency>
 
-        <!-- Spring annotations (test scope) -->
+        <!-- Spring annotations (compile scope — EndpointExtractor uses them at build time) -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
             <version>${spring.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
             <version>${spring.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

@@ -1317,7 +1317,7 @@ class ReturnTypeUnwrapperTest {
 
     @Test
     fun `Optional unwraps to inner type`() {
-        ReturnTypeUnwrapper.unwrap(method("optional").genericReturnType).type shouldBe Item::class.java
+        ReturnTypeUnwrapper.unwrap(method("opt").genericReturnType).type shouldBe Item::class.java
     }
 
     @Test

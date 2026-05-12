@@ -44,21 +44,27 @@ class Emitter {
         outputDir: File,
         controllerEndpoints: Map<String, List<Definition>>,
         sharedTypes: List<Definition>,
-    ) {
+    ): List<File> {
         outputDir.mkdirs()
         clearExistingWs(outputDir)
+
+        val written = mutableListOf<File>()
 
         controllerEndpoints.forEach { (controller, defs) ->
             defs.toNonEmptyListOrNull()?.let { nel ->
                 val path = File(outputDir, "$controller.ws")
                 path.writeText(render(nel, "$controller.ws"))
+                written += path
             }
         }
 
         sharedTypes.toNonEmptyListOrNull()?.let { nel ->
             val path = File(outputDir, "types.ws")
             path.writeText(render(nel, "types.ws"))
+            written += path
         }
+
+        return written
     }
 
     private fun render(defs: NonEmptyList<Definition>, fileName: String): String {

@@ -121,4 +121,41 @@ class EmitterTest {
         File(dir.toFile(), "stale.ws").exists() shouldBe false
         keepMe.exists() shouldBe true
     }
+
+    @Test
+    fun `write returns the list of files it wrote`(@TempDir dir: Path) {
+        val ep = builder.toEndpoint(Endpoint(
+            controllerSimpleName = "HelloController",
+            name = "Hello",
+            method = HttpMethod.GET,
+            pathSegments = listOf(PathSegment.Literal("hello")),
+            queryParams = emptyList(), headerParams = emptyList(), cookieParams = emptyList(),
+            requestBody = null,
+            responseBody = WireType.Primitive(WireType.Primitive.Kind.STRING),
+            statusCode = 200,
+        ))
+        val typeDef = builder.toDefinition(WireType.Object(
+            name = "UserDto",
+            fields = listOf(WireType.Field("id", WireType.Primitive(WireType.Primitive.Kind.STRING))),
+        ))
+
+        val written: List<File> = emitter.write(
+            outputDir = dir.toFile(),
+            controllerEndpoints = mapOf("HelloController" to listOf(ep)),
+            sharedTypes = listOf(typeDef),
+        )
+
+        written.map { it.name }.sorted() shouldBe listOf("HelloController.ws", "types.ws")
+        written.all { it.exists() } shouldBe true
+    }
+
+    @Test
+    fun `write returns empty list when nothing to emit`(@TempDir dir: Path) {
+        val written: List<File> = emitter.write(
+            outputDir = dir.toFile(),
+            controllerEndpoints = emptyMap(),
+            sharedTypes = emptyList(),
+        )
+        written shouldBe emptyList()
+    }
 }

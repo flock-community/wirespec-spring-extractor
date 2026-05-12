@@ -36,6 +36,12 @@ mvn wirespec:extract
   `@JsonIgnore`), Bean Validation (`@NotNull`, `@Size`, `@Pattern`, `@Min`,
   `@Max`), and springdoc `@Schema` awareness
 
+### Known limitations (v1)
+
+- `@Controller` classes with handler methods directly annotated with
+  `@ResponseBody`. Meta-annotated variants (e.g., custom annotations that are
+  themselves annotated with `@ResponseBody`) are not detected in v1.
+
 See [docs/superpowers/specs/2026-05-12-wirespec-spring-extractor-design.md](docs/superpowers/specs/2026-05-12-wirespec-spring-extractor-design.md)
 for the full design and current scope limitations.
 

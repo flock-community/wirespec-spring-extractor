@@ -20,10 +20,12 @@ val itRepoDir = rootProject.layout.buildDirectory.dir("it-repo")
 tasks.test {
     useJUnitPlatform()
 
-    // The fixture builds need our just-built plugin to be discoverable in a
-    // local Maven repo. Publish it into a project-local repo (NOT ~/.m2) so
-    // we don't pollute the user's environment and tests stay reproducible.
+    // The fixture builds need our just-built plugin AND its :extractor-core
+    // dependency to be discoverable in a local Maven repo. Publish both into
+    // a project-local repo (NOT ~/.m2) so we don't pollute the user's
+    // environment and tests stay reproducible.
     dependsOn(":extractor-maven-plugin:publishMavenPublicationToItLocalRepository")
+    dependsOn(":extractor-core:publishMavenPublicationToItLocalRepository")
 
     systemProperty("it.pluginVersion", project.version.toString())
     systemProperty("it.repo", itRepoDir.get().asFile.absolutePath)

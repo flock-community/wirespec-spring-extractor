@@ -88,28 +88,19 @@ dependencies {
     compileOnly(libs.maven.core)
     compileOnly(libs.maven.plugin.annotations)
 
+    // Core extraction logic.
+    implementation(project(":extractor-core"))
+
     // Kotlin
     implementation(libs.kotlin.stdlib)
-    implementation(libs.kotlin.reflect)
-
-    // Classpath scanning
-    implementation(libs.classgraph)
-
-    // Wirespec compiler + Wirespec-language emitter
-    implementation(libs.wirespec.core)
-    implementation(libs.wirespec.emitter)
-
-    // Spring annotations — used by EndpointExtractor at build time.
-    implementation(libs.spring.web)
-    implementation(libs.spring.context)
-    implementation(libs.jackson.annotations)
-    implementation(libs.jakarta.validation)
-    implementation(libs.swagger.annotations)
 
     // Tests
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.assertions)
-    testImplementation(libs.reactor.core)
+    // ExtractMojoTest references the controller fixtures defined under
+    // extractor-core's test sources; pull them in via the testArtifacts
+    // configuration declared in :extractor-core.
+    testImplementation(project(path = ":extractor-core", configuration = "testArtifacts"))
     // WirespecLifecycleParticipantTest uses org.apache.maven.model.* and MavenProject.
     testImplementation(libs.maven.core)
     testImplementation(libs.maven.plugin.api)

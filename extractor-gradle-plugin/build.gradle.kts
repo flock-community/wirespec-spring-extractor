@@ -3,6 +3,7 @@ plugins {
     `java-gradle-plugin`
     alias(libs.plugins.gradle.plugin.publish)
     `maven-publish`
+    alias(libs.plugins.vanniktech.maven.publish.base)
 }
 
 description = "Gradle plugin: extracts Spring Boot endpoints into Wirespec .ws files."
@@ -40,20 +41,7 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Configure the auto-generated `pluginMaven` publication (jar) + `<id>PluginMarkerMaven`
-// (marker) created by java-gradle-plugin. We override the jar's artifactId so the
-// Maven coordinate matches the descriptive `wirespec-spring-extractor-gradle-plugin`
-// rather than the module name.
 publishing {
-    publications.withType<MavenPublication>().configureEach {
-        if (name == "pluginMaven") {
-            artifactId = "wirespec-spring-extractor-gradle-plugin"
-            pom {
-                name.set("Wirespec Spring Extractor Gradle Plugin")
-                description.set(project.description)
-            }
-        }
-    }
     repositories {
         // Build-local repo used by :integration-tests-gradle. Publishing here
         // keeps the fixture Gradle builds isolated from the user's ~/.m2.

@@ -13,6 +13,7 @@ swagger-annotations = "2.2.28"
 reactor = "3.7.0"
 junit = "5.11.3"
 kotest = "5.9.1"
+vanniktech-maven-publish = "0.30.0"
 
 [libraries]
 # Maven plugin API (compileOnly — provided at runtime by the Maven that loads the plugin)
@@ -47,3 +48,4 @@ reactor-core = { module = "io.projectreactor:reactor-core", version.ref = "react
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 maven-plugin-development = { id = "org.gradlex.maven-plugin-development", version.ref = "maven-plugin-development" }
 gradle-plugin-publish = { id = "com.gradle.plugin-publish", version.ref = "gradle-plugin-publish" }
+vanniktech-maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-maven-publish" }

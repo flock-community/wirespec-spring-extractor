@@ -208,11 +208,11 @@ wirespec-spring-extractor/
             <version>3.7.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- swagger-annotations is compile scope because NullabilityResolver imports @Schema -->
         <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-common</artifactId>
-            <version>2.7.0</version>
-            <scope>test</scope>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations</artifactId>
+            <version>2.2.28</version>
         </dependency>
 
         <!-- Tests -->
@@ -2171,16 +2171,18 @@ object NullabilityResolver {
      * Returns true if the given member should be modelled as nullable in Wirespec.
      * Priority order:
      *  1. Java primitive type → non-null
-     *  2. Kotlin nullability metadata (kotlin.Metadata + member type)
-     *  3. Optional<T> → nullable
+     *  2. Optional<T> → nullable (Optional is itself the nullability marker —
+     *     a Kotlin `val maybe: Optional<String>` is "non-null" at the Kotlin
+     *     level but the value it carries is absent-able)
+     *  3. Kotlin nullability metadata (kotlin.Metadata + member type)
      *  4. JSR-305 / @Nullable / @NonNull annotations
      *  5. @NotNull / @NotBlank / @Schema(required=true) → non-null
      *  6. Default → nullable
      */
     fun isNullable(element: AnnotatedElement, declaredJavaType: Class<*>): Boolean {
         if (declaredJavaType.isPrimitive) return false
-        kotlinNullable(element)?.let { return it }
         if (declaredJavaType == Optional::class.java) return true
+        kotlinNullable(element)?.let { return it }
         annotationDeclaredNullable(element)?.let { return it }
         if (element.isAnnotationPresent(NotNull::class.java)) return false
         if (element.isAnnotationPresent(NotBlank::class.java)) return false

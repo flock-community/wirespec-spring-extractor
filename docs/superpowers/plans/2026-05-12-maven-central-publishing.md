@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Wire `extractor-core` and `extractor-maven-plugin` to publish to Sonatype Central Portal from GitHub Actions, triggered by a published GitHub Release; add a separate CI workflow that builds + tests on PRs and pushes to `main`.
+**Goal:** Wire `extractor-core`, `extractor-maven-plugin`, and `extractor-gradle-plugin` to publish to Sonatype Central Portal from GitHub Actions, triggered by a published GitHub Release; add a separate CI workflow that builds + tests on PRs and pushes to `main`.
 
-**Architecture:** Apply the `com.vanniktech.maven.publish` Gradle plugin to the two publishable subprojects from the root build script. The plugin handles Central Portal upload, in-memory PGP signing, javadoc/sources jar generation, and POM defaults; we set coordinates and shared metadata once in `subprojects {}`. The release workflow checks out the tag, overrides `-Pversion=` from the tag name, and runs `publishAndReleaseToMavenCentral`. Secrets reach Gradle as `ORG_GRADLE_PROJECT_*` environment variables.
+**Architecture:** Apply the `com.vanniktech.maven.publish` Gradle plugin to the three publishable subprojects from the root build script. The plugin handles Central Portal upload, in-memory PGP signing, javadoc/sources jar generation, and POM defaults; we set coordinates and shared metadata once in `subprojects {}`. For `extractor-gradle-plugin`, vanniktech auto-detects the `java-gradle-plugin` setup and publishes both the main jar (`pluginMaven`) and the plugin marker (`*PluginMarkerMaven`). The release workflow checks out the tag, overrides `-Pversion=` from the tag name, and runs `publishAndReleaseToMavenCentral`. Secrets reach Gradle as `ORG_GRADLE_PROJECT_*` environment variables.
 
 **Tech Stack:** Gradle 8.x (Kotlin DSL), `com.vanniktech.maven.publish` 0.30.0, GitHub Actions, Sonatype Central Portal, GPG (in-memory armored key).
 
@@ -19,9 +19,10 @@
 | `LICENSE` | Create | Top-level Apache 2.0 license text. |
 | `gradle/libs.versions.toml` | Modify | Add `vanniktech-maven-publish` to `[versions]` and `[plugins]`. |
 | `gradle.properties` | Modify | Append `SONATYPE_HOST` and `RELEASE_SIGNING_ENABLED`. |
-| `build.gradle.kts` (root) | Modify (rewrite) | Apply vanniktech to two subprojects; declare POM metadata once. |
+| `build.gradle.kts` (root) | Modify (rewrite) | Apply vanniktech to three subprojects; declare POM metadata once. |
 | `extractor-core/build.gradle.kts` | Modify | Delete `publications { ... }` block from the `publishing { ... }` block; keep `repositories { ... }`. |
 | `extractor-maven-plugin/build.gradle.kts` | Modify | Same removal; keep `repositories { ... }`. The `packaging = "maven-plugin"` POM tweak now lives in the root config. |
+| `extractor-gradle-plugin/build.gradle.kts` | Modify | Delete the `publications.withType<MavenPublication>().configureEach { ... }` artifactId tweak — vanniktech's `coordinates()` in the root config applies it to `pluginMaven`. Keep `repositories { ... }`. |
 | `.github/workflows/ci.yml` | Create | Build + test on PRs and pushes to `main`. |
 | `.github/workflows/release.yml` | Create | Publish to Central Portal on `release: [published]`. |
 
@@ -133,12 +134,13 @@ git commit -m "build: declare Central Portal endpoint and release signing"
 
 ## Task 4: Wire vanniktech in root + clean subprojects
 
-This task makes three coupled edits — the root and two subprojects — that together replace the existing per-module publishing configuration with a single root-driven configuration. Verification at the end runs the full build to confirm `:integration-tests` still resolves the locally published plugin.
+This task makes four coupled edits — the root and three subprojects — that together replace the existing per-module publishing configuration with a single root-driven configuration. Verification at the end runs the full build to confirm `:integration-tests-maven` and `:integration-tests-gradle` still resolve the locally published artifacts.
 
 **Files:**
 - Modify: `build.gradle.kts` (root) — currently a comments-only stub.
 - Modify: `extractor-core/build.gradle.kts:42-61` — remove the `publications {}` block.
 - Modify: `extractor-maven-plugin/build.gradle.kts:147-170` — remove the `publications {}` block.
+- Modify: `extractor-gradle-plugin/build.gradle.kts:47-65` — remove the `publications.withType<MavenPublication>().configureEach { ... }` block.
 
 - [ ] **Step 1: Rewrite the root `build.gradle.kts`**
 
@@ -147,11 +149,12 @@ Replace the entire contents of `build.gradle.kts` (root) with:
 ```kotlin
 // Root project: this is a multi-module repository.
 // Per-module configuration lives in `extractor-maven-plugin/build.gradle.kts`,
-// `extractor-core/build.gradle.kts`, and `integration-tests/build.gradle.kts`.
+// `extractor-core/build.gradle.kts`, `extractor-gradle-plugin/build.gradle.kts`,
+// and `integration-tests-{maven,gradle}/build.gradle.kts`.
 // Versions and shared coordinates are declared in `gradle.properties` and
 // `gradle/libs.versions.toml`.
 //
-// Maven Central publishing for the two library subprojects is configured here
+// Maven Central publishing for the three library subprojects is configured here
 // via com.vanniktech.maven.publish so POM metadata and signing live in one place.
 
 plugins {
@@ -159,13 +162,14 @@ plugins {
 }
 
 subprojects {
-    if (name in setOf("extractor-core", "extractor-maven-plugin")) {
+    if (name in setOf("extractor-core", "extractor-maven-plugin", "extractor-gradle-plugin")) {
         apply(plugin = "com.vanniktech.maven.publish")
 
         val publishedArtifactId = when (name) {
-            "extractor-core"         -> "wirespec-spring-extractor-core"
-            "extractor-maven-plugin" -> "wirespec-spring-extractor-maven-plugin"
-            else                     -> error("unreachable: $name")
+            "extractor-core"          -> "wirespec-spring-extractor-core"
+            "extractor-maven-plugin"  -> "wirespec-spring-extractor-maven-plugin"
+            "extractor-gradle-plugin" -> "wirespec-spring-extractor-gradle-plugin"
+            else                      -> error("unreachable: $name")
         }
         val isMavenPlugin = name == "extractor-maven-plugin"
 
@@ -272,6 +276,37 @@ publishing {
 
 (The `repositories { maven { name = "itLocal" ... } }` block stays.)
 
+- [ ] **Step 3b: Strip the artifactId-tweak block from `extractor-gradle-plugin/build.gradle.kts`**
+
+Edit `extractor-gradle-plugin/build.gradle.kts`. Replace this exact block:
+
+```kotlin
+// Configure the auto-generated `pluginMaven` publication (jar) + `<id>PluginMarkerMaven`
+// (marker) created by java-gradle-plugin. We override the jar's artifactId so the
+// Maven coordinate matches the descriptive `wirespec-spring-extractor-gradle-plugin`
+// rather than the module name.
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        if (name == "pluginMaven") {
+            artifactId = "wirespec-spring-extractor-gradle-plugin"
+            pom {
+                name.set("Wirespec Spring Extractor Gradle Plugin")
+                description.set(project.description)
+            }
+        }
+    }
+    repositories {
+```
+
+…with:
+
+```kotlin
+publishing {
+    repositories {
+```
+
+(The `repositories { maven { name = "itLocal" ... } }` block stays. The artifactId override moves to the root build's `coordinates()` call, which applies it to `pluginMaven` for both `itLocal` and Maven Central publishing.)
+
 - [ ] **Step 4: Verify Gradle scripts parse and the publish tasks exist**
 
 Run: `./gradlew :extractor-core:tasks --all -q | grep -E "publish(ToMavenLocal|MavenPublicationToItLocalRepository|AndReleaseToMavenCentral)"`
@@ -323,24 +358,36 @@ grep -E "<packaging>maven-plugin</packaging>|<artifactId>wirespec-spring-extract
 
 Expected: both lines present.
 
+Repeat for the Gradle plugin (different publication name — `pluginMaven`, generated by `java-gradle-plugin`):
+
+```bash
+./gradlew :extractor-gradle-plugin:generatePomFileForPluginMavenPublication -q
+grep -c -E "wirespec-spring-extractor-gradle-plugin|Apache License, Version 2.0|wilmveel|flock-community/wirespec-spring-extractor" \
+  extractor-gradle-plugin/build/publications/pluginMaven/pom-default.xml
+```
+
+Expected: a number `>= 4`. If the artifactId is missing or shows `extractor-gradle-plugin` instead of `wirespec-spring-extractor-gradle-plugin`, vanniktech's `coordinates()` didn't apply — investigate.
+
 - [ ] **Step 6: Run the full build to confirm nothing else broke**
 
 Run: `./gradlew build --stacktrace`
 
-Expected: `BUILD SUCCESSFUL`. This exercises the unit tests for both modules and the Maven integration tests under `:integration-tests`, which depend on `publishMavenPublicationToItLocalRepository` — so it is the definitive check that the publishing rewrite did not regress the existing flow.
+Expected: `BUILD SUCCESSFUL`. This exercises the unit tests for all three modules, the Maven integration tests under `:integration-tests-maven` (which depend on `publishMavenPublicationToItLocalRepository`), and the Gradle integration tests under `:integration-tests-gradle` (which depend on `publishAllPublicationsToItLocalRepository`) — the definitive check that the publishing rewrite did not regress the existing flow.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add build.gradle.kts extractor-core/build.gradle.kts extractor-maven-plugin/build.gradle.kts
+git add build.gradle.kts extractor-core/build.gradle.kts extractor-maven-plugin/build.gradle.kts extractor-gradle-plugin/build.gradle.kts
 git commit -m "build: publish via vanniktech maven-publish to Central Portal
 
 Move POM metadata (url, license, scm, developers) into the root build
-script applied to both extractor-core and extractor-maven-plugin via
-subprojects{}. Remove the per-module publications blocks; vanniktech
-generates the maven publication, sources/javadoc jars, and signing.
-Keep the itLocal repositories block in each subproject so the
-integration-tests module can still resolve the freshly built plugin."
+script applied to extractor-core, extractor-maven-plugin, and
+extractor-gradle-plugin via subprojects{}. Remove the per-module
+publications blocks; vanniktech generates the maven (or pluginMaven)
+publication, sources/javadoc jars, and signing. Keep the itLocal
+repositories block in each subproject so the integration-tests-maven
+and integration-tests-gradle modules can still resolve the freshly
+built artifacts."
 ```
 
 ---

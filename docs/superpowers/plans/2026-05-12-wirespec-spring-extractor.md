@@ -1579,7 +1579,7 @@ class TypeExtractorTest {
     }
 
     @Test
-    fun `parameterized List<String> becomes ListOf STRING primitive`() {
+    fun `parameterized List of String becomes ListOf STRING primitive`() {
         val type = UserDto::class.java.getDeclaredField("tags").genericType
         val out = extractor.extract(type)
         out.shouldBeInstanceOf<WireType.ListOf>().element shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)

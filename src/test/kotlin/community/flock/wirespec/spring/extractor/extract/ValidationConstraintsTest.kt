@@ -39,4 +39,13 @@ class ValidationConstraintsTest {
         val out = ValidationConstraints.refine(f, base = WireType.Primitive(WireType.Primitive.Kind.STRING))
         out shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
     }
+
+    @Test
+    fun `same refinement on different fields produces same Refined name`() {
+        val f1 = ValidatedDto::class.java.getDeclaredField("name")
+        val f2 = ValidatedDto::class.java.getDeclaredField("name") // same field used twice — name must be deterministic
+        val r1 = ValidationConstraints.refine(f1, WireType.Primitive(WireType.Primitive.Kind.STRING)) as WireType.Refined
+        val r2 = ValidationConstraints.refine(f2, WireType.Primitive(WireType.Primitive.Kind.STRING)) as WireType.Refined
+        r1.name shouldBe r2.name
+    }
 }

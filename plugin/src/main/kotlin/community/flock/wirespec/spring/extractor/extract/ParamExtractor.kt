@@ -25,18 +25,21 @@ class ParamExtractor(private val types: TypeExtractor) {
     }
 
     private fun toParam(p: Parameter): Param? {
-        val type = types.extract(p.parameterizedType)
+        // Only extract the parameter's type once we've confirmed it's actually a Spring
+        // binding parameter — otherwise we'd pollute TypeExtractor.definitions with
+        // synthetic / framework parameters (notably Kotlin's `Continuation<? super T>`,
+        // which would otherwise leak Continuation and CoroutineContext into the schema).
         AnnotatedElementUtils.findMergedAnnotation(p, PathVariable::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.PATH, type = type)
+            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.PATH, type = types.extract(p.parameterizedType))
         }
         AnnotatedElementUtils.findMergedAnnotation(p, RequestParam::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.QUERY, type = type)
+            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.QUERY, type = types.extract(p.parameterizedType))
         }
         AnnotatedElementUtils.findMergedAnnotation(p, RequestHeader::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.HEADER, type = type)
+            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.HEADER, type = types.extract(p.parameterizedType))
         }
         AnnotatedElementUtils.findMergedAnnotation(p, CookieValue::class.java)?.let { a ->
-            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.COOKIE, type = type)
+            return Param(name = a.value.ifEmpty { a.name }.ifEmpty { p.name }, source = Source.COOKIE, type = types.extract(p.parameterizedType))
         }
         return null
     }

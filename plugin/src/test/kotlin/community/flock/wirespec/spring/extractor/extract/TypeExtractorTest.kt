@@ -2,12 +2,28 @@ package community.flock.wirespec.spring.extractor.extract
 
 import community.flock.wirespec.spring.extractor.fixtures.dto.Container
 import community.flock.wirespec.spring.extractor.fixtures.dto.Role
+import community.flock.wirespec.spring.extractor.fixtures.dto.TemporalDto
 import community.flock.wirespec.spring.extractor.fixtures.dto.UserDto
 import community.flock.wirespec.spring.extractor.model.WireType
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.net.URI
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.OffsetDateTime
+import java.time.Period
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.util.Date
 
 class TypeExtractorTest {
 
@@ -91,6 +107,108 @@ class TypeExtractorTest {
         (r2 as WireType.Ref).name shouldBe "Conflict2"
         val names = freshExtractor.definitions.filterIsInstance<WireType.Object>().map { it.name }
         names shouldContainAll listOf("Conflict", "Conflict2")
+    }
+
+    @Test
+    fun `LocalDateTime maps to STRING primitive and is not registered as a definition`() {
+        extractor.extract(LocalDateTime::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.definitions.map { definitionName(it) } shouldNotContain "LocalDateTime"
+    }
+
+    @Test
+    fun `LocalDate maps to STRING primitive`() {
+        extractor.extract(LocalDate::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `LocalTime maps to STRING primitive`() {
+        extractor.extract(LocalTime::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `Instant maps to STRING primitive`() {
+        extractor.extract(Instant::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `ZoneOffset maps to STRING primitive and is not registered as a definition`() {
+        extractor.extract(ZoneOffset::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.definitions.map { definitionName(it) } shouldNotContain "ZoneOffset"
+    }
+
+    @Test
+    fun `ZoneId maps to STRING primitive`() {
+        extractor.extract(ZoneId::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `ZonedDateTime maps to STRING primitive`() {
+        extractor.extract(ZonedDateTime::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `OffsetDateTime maps to STRING primitive`() {
+        extractor.extract(OffsetDateTime::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `Duration and Period map to STRING primitive`() {
+        extractor.extract(Duration::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.extract(Period::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `BigDecimal and BigInteger map to STRING primitive`() {
+        extractor.extract(BigDecimal::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.extract(BigInteger::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `URI and util Date map to STRING primitive`() {
+        extractor.extract(URI::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.extract(Date::class.java) shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `DTO with JDK temporal fields produces STRING fields and no nested JDK definitions`() {
+        val ref = extractor.extract(TemporalDto::class.java)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "TemporalDto"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "TemporalDto" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["createdAt"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+        byName["birthDate"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+        byName["occurredAt"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+        byName["timezone"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+        byName["zoned"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+        byName["price"]!!.type.shouldBeInstanceOf<WireType.Primitive>().kind shouldBe WireType.Primitive.Kind.STRING
+
+        val defNames = extractor.definitions.map { definitionName(it) }.toSet()
+        defNames shouldNotContain "LocalDateTime"
+        defNames shouldNotContain "LocalDate"
+        defNames shouldNotContain "Instant"
+        defNames shouldNotContain "ZoneOffset"
+        defNames shouldNotContain "ZonedDateTime"
+        defNames shouldNotContain "BigDecimal"
+    }
+
+    @Test
+    fun `List of LocalDateTime becomes ListOf STRING with no JDK definitions`() {
+        val type = TemporalDtoListHolder::class.java.getDeclaredField("timestamps").genericType
+        val out = extractor.extract(type)
+        val list = out.shouldBeInstanceOf<WireType.ListOf>()
+        list.element shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+        extractor.definitions.map { definitionName(it) } shouldNotContain "LocalDateTime"
+    }
+
+    @Suppress("unused")
+    data class TemporalDtoListHolder(val timestamps: List<LocalDateTime>)
+
+    private fun definitionName(w: WireType): String? = when (w) {
+        is WireType.Object  -> w.name
+        is WireType.EnumDef -> w.name
+        is WireType.Refined -> w.name
+        else                -> null
     }
 
     @Test

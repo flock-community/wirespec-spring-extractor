@@ -1,3 +1,19 @@
 package com.acme.api.dto;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
-public record UserDto(String id, int age, boolean active, Role role, List<String> tags) {}
+public record UserDto(
+    String id,
+    int age,
+    boolean active,
+    Role role,
+    List<String> tags,
+    LocalDateTime createdAt,
+    Instant lastSeen,
+    ZoneOffset timezone,
+    BigDecimal balance,
+    String _internalId,
+    String SystemKey
+) {}

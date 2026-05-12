@@ -29,7 +29,7 @@ class EndpointExtractor(private val types: TypeExtractor) {
 
         val allParams = params.extractParams(method)
         val body = params.extractRequestBody(method)
-        val unwrapped = ReturnTypeUnwrapper.unwrap(method.genericReturnType)
+        val unwrapped = ReturnTypeUnwrapper.unwrap(method)
         val responseRef = if (unwrapped.isVoid) null else {
             val raw = types.extract(unwrapped.type)
             if (unwrapped.isList) WireType.ListOf(raw) else raw

@@ -1,7 +1,13 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Legacy Maven output (pre-Gradle migration). Left in place so any stale
+# `target/` dirs from a previous Maven build are still ignored.
 target/
+
 .idea/
 *.iml
 .DS_Store
 .vscode/
 out/
-build/

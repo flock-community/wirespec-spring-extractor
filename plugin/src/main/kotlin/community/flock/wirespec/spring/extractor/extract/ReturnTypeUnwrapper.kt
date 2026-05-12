@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
+import java.lang.reflect.WildcardType
 
 object ReturnTypeUnwrapper {
 
@@ -16,9 +17,43 @@ object ReturnTypeUnwrapper {
         "org.springframework.web.context.request.async.DeferredResult",
     )
     private const val FLUX = "reactor.core.publisher.Flux"
+    private const val CONTINUATION = "kotlin.coroutines.Continuation"
+    private const val KOTLIN_UNIT = "kotlin.Unit"
 
     /** A flattened view of a method's effective response payload. */
     data class Unwrapped(val type: Type, val isList: Boolean, val isVoid: Boolean)
+
+    /**
+     * Method-aware overload: detects Kotlin `suspend` functions (whose compiled
+     * signature has a trailing `Continuation<? super T>` parameter and an erased
+     * `Object` return type) and uses the Continuation's type argument as the
+     * effective response type. Falls through to the [Type] overload for plain
+     * non-suspend methods.
+     */
+    fun unwrap(method: Method): Unwrapped {
+        val effective = continuationReturnType(method) ?: method.genericReturnType
+        return unwrap(effective)
+    }
+
+    /**
+     * If [method]'s last parameter is `Continuation<? super T>`, return `T`
+     * (the actual suspend return type). Otherwise return null.
+     */
+    private fun continuationReturnType(method: Method): Type? {
+        val params = method.genericParameterTypes
+        if (params.isEmpty()) return null
+        val last = params.last() as? ParameterizedType ?: return null
+        val raw = last.rawType as? Class<*> ?: return null
+        if (raw.name != CONTINUATION) return null
+        val arg = last.actualTypeArguments.firstOrNull() ?: return Any::class.java
+        return when (arg) {
+            // `Continuation<? super T>` — T is the lower bound.
+            is WildcardType -> arg.lowerBounds.firstOrNull()
+                ?: arg.upperBounds.firstOrNull()
+                ?: Any::class.java
+            else -> arg
+        }
+    }
 
     fun unwrap(returnType: Type): Unwrapped {
         var current = returnType
@@ -41,8 +76,8 @@ object ReturnTypeUnwrapper {
         }
 
         val isVoid = when (current) {
-            is Class<*> -> current == Void.TYPE || current == Void::class.java
-            else        -> current.typeName == "java.lang.Void"
+            is Class<*> -> current == Void.TYPE || current == Void::class.java || current.name == KOTLIN_UNIT
+            else        -> current.typeName == "java.lang.Void" || current.typeName == KOTLIN_UNIT
         }
 
         return Unwrapped(current, isList = isList, isVoid = isVoid)

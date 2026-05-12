@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Registers WirespecLifecycleParticipant with Plexus so Maven loads it
+  when a project declares this plugin with `<extensions>true</extensions>`.
+  The participant injects a default `extract` execution at process-classes
+  unless the user has already bound the goal themselves.
+-->
+<component-set>
+    <components>
+        <component>
+            <role>org.apache.maven.AbstractMavenLifecycleParticipant</role>
+            <role-hint>wirespec-spring-extractor</role-hint>
+            <implementation>community.flock.wirespec.spring.extractor.WirespecLifecycleParticipant</implementation>
+        </component>
+    </components>
+</component-set>

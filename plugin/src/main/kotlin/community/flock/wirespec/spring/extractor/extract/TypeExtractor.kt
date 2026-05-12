@@ -73,6 +73,13 @@ open class TypeExtractor {
         if (Collection::class.java.isAssignableFrom(cls)) {
             return WireType.ListOf(WireType.Primitive(WireType.Primitive.Kind.STRING), nullable)
         }
+        // JDK / platform value types (java.time.*, java.math.BigDecimal, java.net.URI, …):
+        // walking their declared fields would leak internal implementation details
+        // (e.g. ZoneOffset's `totalSeconds`) into the Wirespec schema. Jackson serializes
+        // these to opaque strings, so represent them as STRING here too.
+        if (isJdkOpaqueType(cls)) {
+            return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
+        }
         // Object class — register and recurse into its fields.
         cache[cls.name]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
         val name = nameFor(cls)
@@ -162,6 +169,27 @@ open class TypeExtractor {
                 val name = raw.replaceFirstChar { it.lowercase() }
                 name to method.genericReturnType
             }
+    }
+
+    /**
+     * Whether [cls] is a JDK / platform value type that should be treated as an
+     * opaque STRING in Wirespec instead of being expanded into a nested object.
+     *
+     * Covers `java.time.*` (LocalDateTime, ZoneOffset, Instant, …), `java.math.*`
+     * (BigDecimal, BigInteger), `java.net.URI/URL`, `java.util.Date`/`Calendar`,
+     * `java.sql.*` temporal types, and anything else shipped in the `java.*` /
+     * `jdk.*` / `sun.*` namespaces that we haven't already mapped above
+     * (primitives, String, ByteArray, UUID, Enum, Collection).
+     */
+    private fun isJdkOpaqueType(cls: Class<*>): Boolean {
+        val pkg = cls.`package`?.name ?: return false
+        return pkg == "java.lang"
+            || pkg.startsWith("java.")
+            || pkg.startsWith("javax.")
+            || pkg.startsWith("jakarta.")
+            || pkg.startsWith("jdk.")
+            || pkg.startsWith("sun.")
+            || pkg.startsWith("com.sun.")
     }
 
     private fun primitiveOf(cls: Class<*>): WireType.Primitive? = when (cls) {

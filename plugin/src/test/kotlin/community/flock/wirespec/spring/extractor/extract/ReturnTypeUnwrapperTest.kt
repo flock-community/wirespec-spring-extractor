@@ -1,6 +1,7 @@
 // src/test/kotlin/community/flock/wirespec/spring/extractor/extract/ReturnTypeUnwrapperTest.kt
 package community.flock.wirespec.spring.extractor.extract
 
+import community.flock.wirespec.spring.extractor.fixtures.SuspendController
 import community.flock.wirespec.spring.extractor.fixtures.wrapped.Item
 import community.flock.wirespec.spring.extractor.fixtures.wrapped.WrappedController
 import io.kotest.matchers.shouldBe
@@ -69,6 +70,41 @@ class ReturnTypeUnwrapperTest {
     fun `@ResponseStatus overrides the default`() {
         val m = method("created")
         ReturnTypeUnwrapper.statusCodeFor(m, ReturnTypeUnwrapper.unwrap(m.genericReturnType)) shouldBe 201
+    }
+
+    private fun suspendMethod(name: String) =
+        SuspendController::class.java.declaredMethods.first { it.name == name }
+
+    @Test
+    fun `suspend function's effective return type comes from the Continuation type arg`() {
+        val m = suspendMethod("getUser")
+        val out = ReturnTypeUnwrapper.unwrap(m)
+        out.type shouldBe Item::class.java
+        out.isVoid shouldBe false
+        out.isList shouldBe false
+    }
+
+    @Test
+    fun `suspend function with @RequestBody parameter still resolves to its declared return`() {
+        val m = suspendMethod("createUser")
+        val out = ReturnTypeUnwrapper.unwrap(m)
+        out.type shouldBe Item::class.java
+        out.isVoid shouldBe false
+    }
+
+    @Test
+    fun `suspend Unit-returning function is treated as void with default status 204`() {
+        val m = suspendMethod("delete")
+        val out = ReturnTypeUnwrapper.unwrap(m)
+        out.isVoid shouldBe true
+        ReturnTypeUnwrapper.statusCodeFor(m, out) shouldBe 204
+    }
+
+    @Test
+    fun `non-suspend methods still unwrap via the Type overload`() {
+        // Smoke: the Method overload must agree with the Type overload for non-suspend methods.
+        val m = WrappedController::class.java.declaredMethods.first { it.name == "raw" }
+        ReturnTypeUnwrapper.unwrap(m).type shouldBe Item::class.java
     }
 
     @Test

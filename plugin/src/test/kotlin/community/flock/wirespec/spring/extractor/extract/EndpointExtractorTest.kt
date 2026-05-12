@@ -5,13 +5,16 @@ import community.flock.wirespec.spring.extractor.fixtures.HelloController
 import community.flock.wirespec.spring.extractor.fixtures.InheritingController
 import community.flock.wirespec.spring.extractor.fixtures.MultiMappingController
 import community.flock.wirespec.spring.extractor.fixtures.ParamsController
+import community.flock.wirespec.spring.extractor.fixtures.SuspendController
 import community.flock.wirespec.spring.extractor.model.Endpoint.HttpMethod
 import community.flock.wirespec.spring.extractor.model.Endpoint.PathSegment
 import community.flock.wirespec.spring.extractor.model.WireType
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 
 class EndpointExtractorTest {
@@ -67,5 +70,36 @@ class EndpointExtractorTest {
             .extract(ParamsController::class.java)
             .single { it.name == "PostItem" }
         ep.requestBody shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `suspend endpoint exposes the Continuation type-arg as the response body`() {
+        val types = TypeExtractor()
+        val endpoints = EndpointExtractor(types).extract(SuspendController::class.java)
+
+        val getUser = endpoints.single { it.name == "GetUser" }
+        getUser.method shouldBe HttpMethod.GET
+        getUser.responseBody.shouldBeInstanceOf<WireType.Ref>().name shouldBe "Item"
+        getUser.statusCode shouldBe 200
+
+        val deleteEp = endpoints.single { it.name == "Delete" }
+        deleteEp.responseBody shouldBe null
+        deleteEp.statusCode shouldBe 204
+    }
+
+    @Test
+    fun `suspend endpoint does not register Continuation or CoroutineContext as definitions`() {
+        val types = TypeExtractor()
+        EndpointExtractor(types).extract(SuspendController::class.java)
+        val defNames = types.definitions.map { d ->
+            when (d) {
+                is WireType.Object  -> d.name
+                is WireType.EnumDef -> d.name
+                is WireType.Refined -> d.name
+                else                -> null
+            }
+        }
+        defNames shouldNotContain "Continuation"
+        defNames shouldNotContain "CoroutineContext"
     }
 }

@@ -25,6 +25,10 @@
                 <groupId>community.flock.wirespec.spring</groupId>
                 <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
                 <version>@project.version@</version>
+                <!-- Zero-config auto-bind: the plugin's lifecycle participant
+                     injects an `extract` execution at process-classes when this
+                     is declared as an extension. No <executions> needed. -->
+                <extensions>true</extensions>
                 <configuration>
                     <output>${project.build.directory}/wirespec</output>
                     <basePackage>com.acme.api</basePackage>

@@ -2,9 +2,11 @@
 package community.flock.wirespec.spring.extractor.extract
 
 import community.flock.wirespec.spring.extractor.fixtures.ParamsController
+import community.flock.wirespec.spring.extractor.fixtures.SuspendController
 import community.flock.wirespec.spring.extractor.model.Param.Source
 import community.flock.wirespec.spring.extractor.model.WireType
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -65,5 +67,42 @@ class ParamExtractorTest {
         val named = ParamsController::class.java.getDeclaredMethod("named", String::class.java)
         val params = pe.extractParams(named)
         params.single().name shouldBe "explicitName"
+    }
+
+    @Test
+    fun `suspend functions do not leak Continuation or CoroutineContext into definitions`() {
+        val types = TypeExtractor()
+        val pe = ParamExtractor(types)
+        // A suspend function's compiled signature has a trailing Continuation<? super Item>
+        // parameter. ParamExtractor walks every parameter, but it must only walk the TYPE
+        // of parameters that will actually become a Spring Param — otherwise it pollutes
+        // TypeExtractor's definition set with Kotlin coroutine internals.
+        SuspendController::class.java.declaredMethods.forEach { pe.extractParams(it) }
+        val defNames = types.definitions.map { definitionName(it) }
+        defNames shouldNotContain "Continuation"
+        defNames shouldNotContain "CoroutineContext"
+    }
+
+    @Test
+    fun `unannotated parameter types are not registered as definitions`() {
+        // Same root-cause check, narrower: any parameter without a Spring binding
+        // annotation must not have its type walked.
+        val types = TypeExtractor()
+        val pe = ParamExtractor(types)
+        val m = SuspendController::class.java.declaredMethods.first { it.name == "createUser" }
+        pe.extractParams(m)  // walks all params; only @RequestBody is annotated, but extractParams
+                             // is for query/path/header/cookie — none of which match here.
+        // The Item @RequestBody type should NOT be registered by extractParams
+        // (only extractRequestBody touches it).
+        val defNames = types.definitions.map { definitionName(it) }
+        defNames shouldNotContain "Item"
+        defNames shouldNotContain "Continuation"
+    }
+
+    private fun definitionName(w: WireType): String? = when (w) {
+        is WireType.Object  -> w.name
+        is WireType.EnumDef -> w.name
+        is WireType.Refined -> w.name
+        else                -> null
     }
 }

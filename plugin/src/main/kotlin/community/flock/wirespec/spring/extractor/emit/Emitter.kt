@@ -5,6 +5,8 @@ import arrow.core.NonEmptyList
 import arrow.core.toNonEmptyListOrNull
 import community.flock.wirespec.compiler.core.FileUri
 import community.flock.wirespec.compiler.core.parse.ast.Definition
+import community.flock.wirespec.compiler.core.parse.ast.FieldIdentifier
+import community.flock.wirespec.compiler.core.parse.ast.Identifier
 import community.flock.wirespec.compiler.core.parse.ast.Module
 import community.flock.wirespec.compiler.core.parse.ast.Root
 import community.flock.wirespec.compiler.utils.Logger
@@ -14,7 +16,20 @@ import java.io.File
 
 class Emitter {
 
-    private val emitter = WirespecEmitter()
+    /**
+     * Custom emitter that also backticks field names starting with `_`.
+     * The upstream [WirespecEmitter] already backticks names that are reserved
+     * keywords or start with an uppercase letter, but Wirespec syntax also
+     * requires underscore-leading field names to be quoted.
+     */
+    private val emitter = object : WirespecEmitter() {
+        override fun emit(identifier: Identifier): String {
+            if (identifier is FieldIdentifier && identifier.value.startsWith("_")) {
+                return "`${identifier.value}`"
+            }
+            return super.emit(identifier)
+        }
+    }
     private val logger: Logger = noLogger
 
     /**

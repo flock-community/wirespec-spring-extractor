@@ -1,6 +1,6 @@
-# wirespec-spring-extractor-maven-plugin
+# wirespec-spring-extractor
 
-A Maven plugin that scans a Spring Boot application's compiled classes and emits
+A Maven and Gradle plugin that scans a Spring Boot application's compiled classes and emits
 [Wirespec](https://wirespec.io) (`.ws`) files describing its HTTP endpoints and DTO types.
 
 ## Usage
@@ -49,6 +49,28 @@ execution yourself:
   </execution>
 </executions>
 ```
+
+## Usage (Gradle)
+
+```kotlin
+plugins {
+    kotlin("jvm") version "2.1.20"               // or `java`
+    id("community.flock.wirespec.spring.extractor") version "0.1.0"
+}
+
+wirespec {
+    // optional — defaults to build/wirespec
+    // outputDir.set(layout.buildDirectory.dir("wirespec"))
+
+    // optional — only scan classes under this package
+    basePackage.set("com.acme.api")
+}
+```
+
+Applying the plugin alongside any JVM source plugin auto-wires
+`extractWirespec` into `assemble`, so `gradle build` (or `gradle assemble`)
+produces `.ws` files in `build/wirespec/`. Run `gradle extractWirespec` to
+trigger it directly.
 
 ## What it extracts
 

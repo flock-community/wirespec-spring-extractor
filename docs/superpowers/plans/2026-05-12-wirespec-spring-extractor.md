@@ -752,6 +752,7 @@ object ControllerScanner {
             .ignoreParentClassLoaders()
             .enableClassInfo()
             .enableAnnotationInfo()
+            .enableMethodInfo()  // required for hasResponseBodyMethod() — ClassGraph throws without it
 
         val accepted = scanPackages.filter { it.isNotBlank() }
         if (accepted.isNotEmpty()) graph.acceptPackages(*accepted.toTypedArray())

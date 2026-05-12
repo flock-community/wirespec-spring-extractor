@@ -22,11 +22,13 @@ object ControllerScanner {
      *
      * @param scanPackages packages to include in the scan; pass empty for "everything reachable".
      * @param basePackage  if non-null, additionally restrict results to classes whose FQN starts with this prefix.
+     * @param onWarn       called with a message whenever a class is skipped due to a load error.
      */
     fun scan(
         classLoader: ClassLoader,
         scanPackages: List<String>,
         basePackage: String?,
+        onWarn: (String) -> Unit = {},
     ): List<Class<*>> {
         val graph = ClassGraph()
             .overrideClassLoaders(classLoader)
@@ -47,7 +49,13 @@ object ControllerScanner {
                 .distinctBy { it.name }
                 .filter { ci -> FRAMEWORK_EXCLUSIONS.none { ci.name.startsWith("$it.") } }
                 .filter { ci -> basePackage == null || ci.name.startsWith("$basePackage.") || ci.name == basePackage }
-                .map { ci -> ci.loadClass() }
+                .mapNotNull { ci ->
+                    try { ci.loadClass() }
+                    catch (t: Throwable) {
+                        onWarn("Skipping ${ci.name}: ${t.message}")
+                        null
+                    }
+                }
         }
     }
 

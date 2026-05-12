@@ -39,18 +39,18 @@ class ExtractMojo : AbstractMojo() {
                 "No compiled classes in ${classesDir.absolutePath}. Did `compile` run before `wirespec:extract`?"
             )
         }
-        if (output.exists() && !output.canWrite()) {
-            throw MojoExecutionException("Output dir not writable: ${output.absolutePath}")
-        }
+        assertOutputWritable(output)
 
         val urls = ClasspathBuilder.collectUrls(
             runtimeClasspathElements = project.runtimeClasspathElements,
             outputDirectory = classesDir,
         )
-        val loader = ClasspathBuilder.fromUrls(urls, parent = javaClass.classLoader)
 
-        val scanPackages = listOfNotNull(basePackage)
-        val controllers = ControllerScanner.scan(loader, scanPackages, basePackage)
+        val effectiveBasePackage = effectiveBasePackage(basePackage)
+        val scanPackages = listOfNotNull(effectiveBasePackage)
+
+        ClasspathBuilder.fromUrls(urls, parent = javaClass.classLoader).use { loader ->
+        val controllers = ControllerScanner.scan(loader, scanPackages, effectiveBasePackage, onWarn = log::warn)
         log.info("Found ${controllers.size} controller(s)")
 
         val types = TypeExtractor()
@@ -87,6 +87,7 @@ class ExtractMojo : AbstractMojo() {
             sharedTypes = sharedTypes,
         )
         log.info("Wrote ${byController.size + (if (sharedTypes.isEmpty()) 0 else 1)} .ws file(s) to ${output.absolutePath}")
+        } // end loader.use
     }
 }
 
@@ -96,3 +97,18 @@ class ExtractMojo : AbstractMojo() {
  */
 internal fun detectControllerCollisions(controllers: List<Class<*>>): Map<String, List<String>> =
     controllers.groupBy { it.simpleName }.filterValues { it.size > 1 }.mapValues { (_, classes) -> classes.map { it.name } }
+
+/** Normalises the raw `<basePackage>` parameter: blank or null becomes null. */
+internal fun effectiveBasePackage(raw: String?): String? = raw?.takeIf { it.isNotBlank() }
+
+/**
+ * Asserts that [output] (or the nearest existing ancestor) is writable.
+ * Throws [MojoExecutionException] if no writable ancestor can be found.
+ */
+internal fun assertOutputWritable(output: File) {
+    val existing = generateSequence(output) { it.parentFile }.firstOrNull { it.exists() }
+        ?: throw MojoExecutionException("No writable ancestor for output: ${output.absolutePath}")
+    if (!existing.canWrite()) {
+        throw MojoExecutionException("Output dir not writable: ${existing.absolutePath}")
+    }
+}

@@ -14,10 +14,10 @@ class WirespecExtractorPluginTest {
     }
 
     @Test
-    fun `applying the plugin registers the wirespec extension`() {
+    fun `applying the plugin registers the wirespecExtractor extension`() {
         val project = project()
 
-        val extension = project.extensions.findByName("wirespec")
+        val extension = project.extensions.findByName("wirespecExtractor")
         extension.shouldNotBeNull()
         (extension is WirespecExtractorExtension) shouldBe true
     }

@@ -15,11 +15,11 @@ import org.gradle.api.tasks.SourceSetContainer
  *     kotlin("jvm")
  *     id("community.flock.wirespec.spring.extractor")
  * }
- * wirespec { basePackage.set("com.acme.api") }
+ * wirespecExtractor { basePackage.set("com.acme.api") }
  * ```
  *
  * Wiring:
- *   - Registers `wirespec { outputDir; basePackage }` extension.
+ *   - Registers `wirespecExtractor { outputDir; basePackage }` extension.
  *   - When [JavaPlugin] is applied (Kotlin-JVM applies it under the hood),
  *     registers the `extractWirespec` task using `sourceSets.main` outputs
  *     and runtime classpath, and makes `assemble` depend on it so
@@ -27,7 +27,7 @@ import org.gradle.api.tasks.SourceSetContainer
  */
 class WirespecExtractorPlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        val ext = project.extensions.create("wirespec", WirespecExtractorExtension::class.java).apply {
+        val ext = project.extensions.create("wirespecExtractor", WirespecExtractorExtension::class.java).apply {
             outputDir.convention(project.layout.buildDirectory.dir("wirespec"))
             // basePackage left without a convention → null/unset means scan everything.
         }

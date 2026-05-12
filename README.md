@@ -3,62 +3,61 @@
 A Maven and Gradle plugin that scans a Spring Boot application's compiled classes and emits
 [Wirespec](https://wirespec.io) (`.ws`) files describing its HTTP endpoints and DTO types.
 
-## Usage
+## Usage (Maven)
+
+Drop the plugin into `pom.xml` with `<extensions>true</extensions>` and it
+auto-binds to `process-classes`:
 
 ```xml
-<plugin>
-  <groupId>community.flock.wirespec.spring</groupId>
-  <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
-  <version>0.1.0</version>
-  <extensions>true</extensions>
-  <configuration>
-    <output>${project.build.directory}/wirespec</output>
-    <!-- optional: only scan classes under this package -->
-    <basePackage>com.acme.api</basePackage>
-  </configuration>
-</plugin>
+<build>
+  <plugins>
+    <plugin>
+      <groupId>community.flock.wirespec.spring</groupId>
+      <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
+      <version>0.1.0</version>
+      <extensions>true</extensions>
+      <configuration>
+        <!-- optional — defaults to ${project.build.directory}/wirespec -->
+        <output>${project.build.directory}/wirespec</output>
+        <!-- optional — only scan classes under this package -->
+        <basePackage>com.acme.api</basePackage>
+      </configuration>
+    </plugin>
+  </plugins>
+</build>
 ```
 
-With `<extensions>true</extensions>` the plugin's Maven lifecycle participant
-auto-binds the `extract` goal to the `process-classes` phase — no
-`<executions>` block needed. A normal `mvn package` (or `install`, `verify`,
-`test`, `process-classes` — anything from `process-classes` onward) produces
-`.ws` files in `target/wirespec/`.
-
-> ⚠️ **`mvn compile` is *not* enough.** Maven's `compile` phase finishes one
-> step before `process-classes`, so the plugin is not yet triggered. Use
-> `mvn process-classes` as the minimum, or invoke
-> `mvn compile wirespec:extract` to run both explicitly. `mvn test`,
-> `mvn package`, `mvn install`, etc. all include `process-classes` and will
-> run the plugin automatically.
-
-To run it manually outside the lifecycle:
+`mvn package` (or any goal from `process-classes` onward) writes `.ws`
+files into `target/wirespec/`. To trigger the goal directly:
 
 ```bash
 mvn wirespec:extract
 ```
 
-If you'd rather bind explicitly (e.g. to a different phase, or to skip the
-extension mechanism), drop `<extensions>true</extensions>` and declare the
-execution yourself:
-
-```xml
-<executions>
-  <execution>
-    <goals><goal>extract</goal></goals>
-  </execution>
-</executions>
-```
-
 ## Usage (Gradle)
+
+### Kotlin project
 
 ```kotlin
 plugins {
-    kotlin("jvm") version "2.1.20"               // or `java`
+    kotlin("jvm") version "2.1.20"
     id("community.flock.wirespec.spring.extractor") version "0.1.0"
 }
 
-wirespec {
+dependencies {
+    implementation("org.springframework:spring-web:6.1.14")
+}
+
+kotlin {
+    jvmToolchain(21)
+    compilerOptions {
+        // So Spring's @PathVariable/@RequestParam (and the extractor) can
+        // recover parameter names that have no explicit value().
+        freeCompilerArgs.add("-java-parameters")
+    }
+}
+
+wirespecExtractor {
     // optional — defaults to build/wirespec
     // outputDir.set(layout.buildDirectory.dir("wirespec"))
 
@@ -67,10 +66,45 @@ wirespec {
 }
 ```
 
+### Java project
+
+```kotlin
+plugins {
+    java
+    id("community.flock.wirespec.spring.extractor") version "0.1.0"
+}
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
+dependencies {
+    implementation("org.springframework:spring-web:6.1.14")
+}
+
+// So Spring's @PathVariable/@RequestParam (and the extractor) can recover
+// parameter names that have no explicit value().
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-parameters")
+}
+
+wirespecExtractor {
+    basePackage.set("com.acme.api")
+}
+```
+
 Applying the plugin alongside any JVM source plugin auto-wires
 `extractWirespec` into `assemble`, so `gradle build` (or `gradle assemble`)
-produces `.ws` files in `build/wirespec/`. Run `gradle extractWirespec` to
-trigger it directly.
+writes `.ws` files into `build/wirespec/`. To trigger it directly:
+
+```bash
+./gradlew extractWirespec
+```
+
+> ⚠️ **Compile with `-parameters` / `-java-parameters`.** Without it the
+> JVM erases method parameter names, and `@PathVariable Long id` —
+> declared without an explicit `value` — comes out as `arg0`. Both
+> fixture builds in this repo set the flag, and you should too.
 
 ## What it extracts
 

@@ -7,7 +7,7 @@ import org.gradle.api.provider.Property
  * Build-script DSL for the Gradle plugin:
  *
  * ```kotlin
- * wirespec {
+ * wirespecExtractor {
  *     outputDir.set(layout.buildDirectory.dir("wirespec"))   // default
  *     basePackage.set("com.acme.api")
  * }

@@ -17,6 +17,6 @@ kotlin {
     }
 }
 
-wirespec {
+wirespecExtractor {
     basePackage.set("com.acme.api")
 }

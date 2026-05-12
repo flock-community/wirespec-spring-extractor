@@ -17,6 +17,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
 }
 
-wirespec {
+wirespecExtractor {
     basePackage.set("com.acme.api")
 }

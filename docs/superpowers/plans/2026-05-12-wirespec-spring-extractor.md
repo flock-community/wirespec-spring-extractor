@@ -10,7 +10,7 @@
 - Kotlin 2.1.x, JVM 21
 - Maven plugin: `maven-plugin-api` 3.9.x + `maven-plugin-annotations` 3.13.x
 - Reflection scan: `io.github.classgraph:classgraph` 4.8.x
-- Wirespec AST + emitter: `community.flock.wirespec.compiler:core-jvm` 0.17.20 + `community.flock.wirespec.compiler:emitters-wirespec-jvm` 0.17.20
+- Wirespec AST + emitter: `community.flock.wirespec.compiler:core-jvm` 0.17.20 + `community.flock.wirespec.compiler.emitters:wirespec-jvm` 0.17.20 (note: `emitters` is part of the groupId, not artifactId)
 - Spring annotations (test-scope): `spring-web` 6.x, `spring-context` 6.x
 - Tests: JUnit 5 + Kotest assertions
 - Integration tests: `maven-invoker-plugin` 3.9.x
@@ -172,8 +172,8 @@ wirespec-spring-extractor/
             <version>${wirespec.version}</version>
         </dependency>
         <dependency>
-            <groupId>community.flock.wirespec.compiler</groupId>
-            <artifactId>emitters-wirespec-jvm</artifactId>
+            <groupId>community.flock.wirespec.compiler.emitters</groupId>
+            <artifactId>wirespec-jvm</artifactId>
             <version>${wirespec.version}</version>
         </dependency>
 

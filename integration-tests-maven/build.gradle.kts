@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
-description = "End-to-end tests that drive the published plugin against fixture Spring/Kotlin projects via `mvn`."
+description = "End-to-end tests that drive the published Maven plugin against fixture Spring/Kotlin projects via `mvn`."
 
 kotlin {
     jvmToolchain(21)

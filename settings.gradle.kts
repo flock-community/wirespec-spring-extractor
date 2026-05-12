@@ -17,5 +17,5 @@ dependencyResolutionManagement {
 include(":extractor-core")
 include(":extractor-maven-plugin")
 include(":extractor-gradle-plugin")
-include(":integration-tests")
+include(":integration-tests-maven")
 include(":integration-tests-gradle")

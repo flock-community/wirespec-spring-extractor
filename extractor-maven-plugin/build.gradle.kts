@@ -160,7 +160,7 @@ publishing {
         }
     }
     repositories {
-        // Build-local repo used by the :integration-tests module. Publishing
+        // Build-local repo used by the :integration-tests-maven module. Publishing
         // here keeps the fixture Maven builds isolated from the user's ~/.m2.
         maven {
             name = "itLocal"

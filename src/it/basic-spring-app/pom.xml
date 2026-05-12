@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.acme</groupId>
+    <artifactId>basic-spring-app</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>6.1.14</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>community.flock.wirespec.spring</groupId>
+                <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <configuration>
+                    <output>${project.build.directory}/wirespec</output>
+                    <basePackage>com.acme.api</basePackage>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -196,11 +196,11 @@ wirespec-spring-extractor/
             <artifactId>jackson-annotations</artifactId>
             <version>2.18.1</version>
         </dependency>
+        <!-- jakarta.validation-api is compile scope because ValidationConstraints (production code) imports it -->
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
             <version>3.1.0</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.projectreactor</groupId>

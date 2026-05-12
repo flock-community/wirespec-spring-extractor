@@ -97,10 +97,6 @@ dependencies {
     // Tests
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.assertions)
-    // ExtractMojoTest references the controller fixtures defined under
-    // extractor-core's test sources; pull them in via the testArtifacts
-    // configuration declared in :extractor-core.
-    testImplementation(project(path = ":extractor-core", configuration = "testArtifacts"))
     // WirespecLifecycleParticipantTest uses org.apache.maven.model.* and MavenProject.
     testImplementation(libs.maven.core)
     testImplementation(libs.maven.plugin.api)

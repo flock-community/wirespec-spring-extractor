@@ -39,17 +39,6 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Expose test classes (notably the `fixtures/` subtree) to other modules'
-// test classpaths via a secondary configuration. Used by
-// `:extractor-maven-plugin`'s ExtractMojoTest, which references controller
-// fixtures defined here.
-val testJar = tasks.register<Jar>("testJar") {
-    archiveClassifier.set("tests")
-    from(sourceSets.test.get().output)
-}
-val testArtifacts: Configuration by configurations.creating
-artifacts.add(testArtifacts.name, testJar)
-
 publishing {
     publications {
         create<MavenPublication>("maven") {

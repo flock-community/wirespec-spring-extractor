@@ -190,11 +190,11 @@ wirespec-spring-extractor/
             <artifactId>spring-context</artifactId>
             <version>${spring.version}</version>
         </dependency>
+        <!-- jackson-annotations is compile scope because JacksonNames (production code) imports it -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
             <version>2.18.1</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>jakarta.validation</groupId>
@@ -1773,10 +1773,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class JacksonDto(
-    @JsonProperty("user_id") val userId: String,
-    @JsonIgnore val internalNote: String,
+    @field:JsonProperty("user_id") val userId: String,
+    @field:JsonIgnore val internalNote: String,
     val visible: String,
 )
+// Note: @field: use-site target is required so the annotation lands on the
+// generated backing field (where reflection looks). Without it, the annotation
+// only lives on the constructor parameter.
 ```
 
 - [ ] **Step 2: Write the failing test**

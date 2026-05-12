@@ -73,4 +73,11 @@ class TypeExtractorTest {
     }
 
     data class SelfRef(val next: SelfRef?)
+
+    @Test
+    fun `walkFields honors @JsonProperty and @JsonIgnore`() {
+        extractor.extract(community.flock.wirespec.spring.extractor.fixtures.dto.JacksonDto::class.java)
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "JacksonDto" } as WireType.Object
+        obj.fields.map { it.name } shouldBe listOf("user_id", "visible")
+    }
 }

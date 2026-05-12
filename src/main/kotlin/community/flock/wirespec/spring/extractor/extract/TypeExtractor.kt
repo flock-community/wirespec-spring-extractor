@@ -78,10 +78,20 @@ open class TypeExtractor {
     }
 
     /** Override-able by subclasses (Tasks 9-12) to inject Jackson/Validation/Schema processing. */
-    protected open fun walkFields(cls: Class<*>): List<WireType.Field> =
-        propertyMembers(cls).map { (name, type) ->
-            WireType.Field(name = name, type = extractInner(type, nullable = false))
+    protected open fun walkFields(cls: Class<*>): List<WireType.Field> {
+        val members = propertyMembers(cls)
+        return members.mapNotNull { (name, type) ->
+            val element = cls.declaredFieldOrNull(name) ?: cls
+            if (JacksonNames.isIgnored(element)) null
+            else WireType.Field(
+                name = JacksonNames.effectiveName(element, original = name),
+                type = extractInner(type, nullable = false),
+            )
         }
+    }
+
+    private fun Class<*>.declaredFieldOrNull(name: String): java.lang.reflect.Field? =
+        try { getDeclaredField(name) } catch (_: NoSuchFieldException) { null }
 
     /**
      * Discover (name, generic-type) pairs for a class:

@@ -82,10 +82,13 @@ open class TypeExtractor {
         val members = propertyMembers(cls)
         return members.mapNotNull { (name, type) ->
             val element = cls.declaredFieldOrNull(name) ?: cls
-            if (JacksonNames.isIgnored(element)) null
-            else WireType.Field(
+            if (JacksonNames.isIgnored(element)) return@mapNotNull null
+            val rawType = extractInner(type, nullable = false)
+            val refined = ValidationConstraints.refine(element, rawType)
+            if (refined is WireType.Refined) _definitions += refined
+            WireType.Field(
                 name = JacksonNames.effectiveName(element, original = name),
-                type = extractInner(type, nullable = false),
+                type = if (refined is WireType.Refined) WireType.Ref(refined.name) else refined,
             )
         }
     }

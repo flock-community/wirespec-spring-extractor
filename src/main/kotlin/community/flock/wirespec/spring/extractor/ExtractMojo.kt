@@ -57,6 +57,14 @@ class ExtractMojo : AbstractMojo() {
         val endpoints = EndpointExtractor(types)
         val builder = WirespecAstBuilder()
 
+        val collisions = detectControllerCollisions(controllers)
+        if (collisions.isNotEmpty()) {
+            val msg = collisions.entries.joinToString("; ") { (name, classes) ->
+                "$name in [${classes.joinToString(", ")}]"
+            }
+            throw MojoExecutionException("Controller simple-name collisions: $msg")
+        }
+
         val byController = controllers.associate { c ->
             val eps = try {
                 endpoints.extract(c).map(builder::toEndpoint)
@@ -81,3 +89,10 @@ class ExtractMojo : AbstractMojo() {
         log.info("Wrote ${byController.size + (if (sharedTypes.isEmpty()) 0 else 1)} .ws file(s) to ${output.absolutePath}")
     }
 }
+
+/**
+ * Returns a map of simple name -> list of FQNs for controllers that share the same simple name.
+ * An empty map means no collisions.
+ */
+internal fun detectControllerCollisions(controllers: List<Class<*>>): Map<String, List<String>> =
+    controllers.groupBy { it.simpleName }.filterValues { it.size > 1 }.mapValues { (_, classes) -> classes.map { it.name } }

@@ -10,6 +10,7 @@ A Maven plugin that scans a Spring Boot application's compiled classes and emits
   <groupId>community.flock.wirespec.spring</groupId>
   <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
   <version>0.1.0</version>
+  <extensions>true</extensions>
   <configuration>
     <output>${project.build.directory}/wirespec</output>
     <!-- optional: only scan classes under this package -->
@@ -18,11 +19,35 @@ A Maven plugin that scans a Spring Boot application's compiled classes and emits
 </plugin>
 ```
 
-The plugin auto-binds to the `process-classes` phase, so a normal `mvn compile`
-will produce `.ws` files in `target/wirespec/`. To run it manually:
+With `<extensions>true</extensions>` the plugin's Maven lifecycle participant
+auto-binds the `extract` goal to the `process-classes` phase — no
+`<executions>` block needed. A normal `mvn package` (or `install`, `verify`,
+`test`, `process-classes` — anything from `process-classes` onward) produces
+`.ws` files in `target/wirespec/`.
+
+> ⚠️ **`mvn compile` is *not* enough.** Maven's `compile` phase finishes one
+> step before `process-classes`, so the plugin is not yet triggered. Use
+> `mvn process-classes` as the minimum, or invoke
+> `mvn compile wirespec:extract` to run both explicitly. `mvn test`,
+> `mvn package`, `mvn install`, etc. all include `process-classes` and will
+> run the plugin automatically.
+
+To run it manually outside the lifecycle:
 
 ```bash
 mvn wirespec:extract
+```
+
+If you'd rather bind explicitly (e.g. to a different phase, or to skip the
+extension mechanism), drop `<extensions>true</extensions>` and declare the
+execution yourself:
+
+```xml
+<executions>
+  <execution>
+    <goals><goal>extract</goal></goals>
+  </execution>
+</executions>
 ```
 
 ## What it extracts

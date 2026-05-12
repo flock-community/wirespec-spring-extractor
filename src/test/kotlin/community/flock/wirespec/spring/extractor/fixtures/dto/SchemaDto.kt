@@ -14,3 +14,10 @@ data class SchemaDto(
     val nullable: String?,
     val notNullablePrimitive: Int,
 )
+
+/** Fixture for testing JSR-305 / IDE-style nullability annotations (step 4). */
+object JsrNullableFixtures {
+    /** Parameter annotated with @Nullable — kotlinNullable skips non-Field elements, so step 4 fires. */
+    @Suppress("unused")
+    fun withNullable(@org.jetbrains.annotations.Nullable maybe: String): Unit = Unit
+}

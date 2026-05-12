@@ -46,11 +46,27 @@ object NullabilityResolver {
         return prop.returnType.isMarkedNullable
     }
 
+    private val NULLABLE_FQNS = setOf(
+        "javax.annotation.Nullable",
+        "jakarta.annotation.Nullable",
+        "org.jetbrains.annotations.Nullable",
+        "androidx.annotation.Nullable",
+        "edu.umd.cs.findbugs.annotations.Nullable",
+    )
+
+    private val NON_NULL_FQNS = setOf(
+        "javax.annotation.Nonnull",
+        "jakarta.annotation.Nonnull",
+        "org.jetbrains.annotations.NotNull",
+        "androidx.annotation.NonNull",
+        "edu.umd.cs.findbugs.annotations.NonNull",
+    )
+
     private fun annotationDeclaredNullable(element: AnnotatedElement): Boolean? {
-        val annotations = element.annotations.map { it.annotationClass.simpleName }
+        val fqns = element.annotations.map { it.annotationClass.qualifiedName ?: it.annotationClass.java.name }
         return when {
-            annotations.any { it.equals("Nullable", ignoreCase = true) } -> true
-            annotations.any { it.equals("NonNull", ignoreCase = true) || it.equals("NotNull", ignoreCase = true) } -> false
+            fqns.any { it in NULLABLE_FQNS } -> true
+            fqns.any { it in NON_NULL_FQNS } -> false
             else -> null
         }
     }

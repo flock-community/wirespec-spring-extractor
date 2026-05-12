@@ -1,5 +1,6 @@
 package community.flock.wirespec.spring.extractor.extract
 
+import community.flock.wirespec.spring.extractor.fixtures.dto.JsrNullableFixtures
 import community.flock.wirespec.spring.extractor.fixtures.dto.SchemaDto
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -34,5 +35,12 @@ class NullabilityResolverTest {
     fun `Schema description is exposed`() {
         val f = SchemaDto::class.java.getDeclaredField("name")
         NullabilityResolver.schemaDescription(f) shouldBe "The user's display name"
+    }
+
+    @Test
+    fun `JSR-305 @Nullable on a parameter flips to nullable`() {
+        // Parameters are not Fields, so kotlinNullable() short-circuits and step 4 fires.
+        val p = JsrNullableFixtures::class.java.getDeclaredMethod("withNullable", String::class.java).parameters[0]
+        NullabilityResolver.isNullable(p, declaredJavaType = p.type) shouldBe true
     }
 }

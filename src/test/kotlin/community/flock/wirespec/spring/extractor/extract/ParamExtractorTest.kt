@@ -59,4 +59,11 @@ class ParamExtractorTest {
     fun `getItem has no @RequestBody parameter`() {
         pe.extractRequestBody(getItem) shouldBe null
     }
+
+    @Test
+    fun `@RequestParam name attribute is honored as the param name`() {
+        val named = ParamsController::class.java.getDeclaredMethod("named", String::class.java)
+        val params = pe.extractParams(named)
+        params.single().name shouldBe "explicitName"
+    }
 }

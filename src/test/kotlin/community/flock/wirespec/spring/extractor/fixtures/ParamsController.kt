@@ -24,4 +24,9 @@ class ParamsController {
 
     @PostMapping("/items")
     fun postItem(@RequestBody body: String): String = ""
+
+    @GetMapping("/named")
+    fun named(
+        @RequestParam(name = "explicitName") explicit: String,
+    ): String = ""
 }

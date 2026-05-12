@@ -5,8 +5,9 @@ import java.io.File
 /**
  * Input to [WirespecExtractor.extract].
  *
- * @property classesDirectory  Directory of compiled `.class` files to scan
- *   (typically `target/classes` in a Maven project).
+ * @property classesDirectories One or more directories of compiled `.class` files
+ *   to scan. Maven projects pass one (`target/classes`); Gradle JVM projects
+ *   typically pass two (`build/classes/java/main`, `build/classes/kotlin/main`).
  * @property runtimeClasspath  Additional jars and directories needed so the
  *   class loader can resolve types referenced by scanned classes.
  * @property outputDirectory   Where `.ws` files will be written.
@@ -15,7 +16,7 @@ import java.io.File
  * @property log               Logger sink. Defaults to [ExtractLog.NoOp].
  */
 data class ExtractConfig(
-    val classesDirectory: File,
+    val classesDirectories: List<File>,
     val runtimeClasspath: List<File>,
     val outputDirectory: File,
     val basePackage: String? = null,

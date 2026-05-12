@@ -24,17 +24,19 @@ object WirespecExtractor {
      *   share a simple name.
      */
     fun extract(config: ExtractConfig): ExtractResult {
-        val classesDir = config.classesDirectory
-        if (!classesDir.exists() || classesDir.listFiles().isNullOrEmpty()) {
+        val classesDirs = config.classesDirectories
+        val hasAnyClasses = classesDirs.any { it.exists() && !it.listFiles().isNullOrEmpty() }
+        if (!hasAnyClasses) {
+            val paths = classesDirs.joinToString(", ") { it.absolutePath }
             throw WirespecExtractorException(
-                "No compiled classes in ${classesDir.absolutePath}. Did `compile` run before `wirespec:extract`?"
+                "No compiled classes in $paths. Did compilation run before extraction?"
             )
         }
         assertOutputWritable(config.outputDirectory)
 
         val urls = ClasspathBuilder.collectUrls(
             runtimeClasspathElements = config.runtimeClasspath.map { it.absolutePath },
-            outputDirectory = classesDir,
+            outputDirectories = classesDirs,
         )
 
         val effectiveBasePackage = effectiveBasePackage(config.basePackage)

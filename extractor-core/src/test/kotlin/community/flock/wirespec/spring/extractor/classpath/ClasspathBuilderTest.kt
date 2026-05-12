@@ -32,16 +32,18 @@ class ClasspathBuilderTest {
     }
 
     @Test
-    fun `fromMavenInputs combines runtime classpath with output dir`() {
+    fun `collectUrls combines runtime classpath with output dirs`() {
         val classesDir = File("/tmp/classes")
+        val kotlinClassesDir = File("/tmp/kotlin-classes")
         val jar = File("/tmp/dep.jar")
 
         val urls = ClasspathBuilder.collectUrls(
             runtimeClasspathElements = listOf(jar.absolutePath),
-            outputDirectory = classesDir,
+            outputDirectories = listOf(classesDir, kotlinClassesDir),
         )
 
         urls shouldContain classesDir.toURI().toURL()
+        urls shouldContain kotlinClassesDir.toURI().toURL()
         urls shouldContain jar.toURI().toURL()
     }
 }

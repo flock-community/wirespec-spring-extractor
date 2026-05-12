@@ -24,7 +24,7 @@ class WirespecExtractorTest {
         val out = File(tmp.toFile(), "ws").apply { mkdirs() }
         val result = WirespecExtractor.extract(
             ExtractConfig(
-                classesDirectory = thisModuleClassesDir(),
+                classesDirectories = listOf(thisModuleClassesDir()),
                 runtimeClasspath = emptyList(),
                 outputDirectory = out,
                 basePackage = "community.flock.wirespec.spring.extractor.fixtures",
@@ -44,14 +44,14 @@ class WirespecExtractorTest {
         val ex = assertThrows<WirespecExtractorException> {
             WirespecExtractor.extract(
                 ExtractConfig(
-                    classesDirectory = missing,
+                    classesDirectories = listOf(missing),
                     runtimeClasspath = emptyList(),
                     outputDirectory = out,
                 )
             )
         }
         ex.message!! shouldContain "No compiled classes in"
-        ex.message!! shouldContain "Did `compile` run before `wirespec:extract`?"
+        ex.message!! shouldContain "Did compilation run before extraction?"
     }
 
     @Test
@@ -66,7 +66,7 @@ class WirespecExtractorTest {
 
         WirespecExtractor.extract(
             ExtractConfig(
-                classesDirectory = thisModuleClassesDir(),
+                classesDirectories = listOf(thisModuleClassesDir()),
                 runtimeClasspath = emptyList(),
                 outputDirectory = out,
                 basePackage = "community.flock.wirespec.spring.extractor.fixtures",
@@ -84,7 +84,7 @@ class WirespecExtractorTest {
         // Just verify the default is wired without throwing.
         WirespecExtractor.extract(
             ExtractConfig(
-                classesDirectory = thisModuleClassesDir(),
+                classesDirectories = listOf(thisModuleClassesDir()),
                 runtimeClasspath = emptyList(),
                 outputDirectory = out,
                 basePackage = "community.flock.wirespec.spring.extractor.fixtures",

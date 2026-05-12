@@ -39,6 +39,15 @@ object EndpointExtractor {
         val allParams = ParamExtractor.extractParams(method)
         val bodyParam = ParamExtractor.extractRequestBodyParameter(method)
 
+        val unwrapped = ReturnTypeUnwrapper.unwrap(method.genericReturnType)
+        val responseRef = if (unwrapped.isVoid) null
+            else community.flock.wirespec.spring.extractor.model.WireType.Ref(
+                (unwrapped.type as? Class<*>)?.simpleName ?: "Unknown"
+            ).let { ref ->
+                if (unwrapped.isList) community.flock.wirespec.spring.extractor.model.WireType.ListOf(ref)
+                else ref
+            }
+
         return httpMethods.flatMap { rm ->
             classPaths.flatMap { cp ->
                 methodPaths.map { mp ->
@@ -54,8 +63,8 @@ object EndpointExtractor {
                             // Real type resolution comes in Task 8.
                             community.flock.wirespec.spring.extractor.model.WireType.Ref("Unknown")
                         },
-                        responseBody = null,          // Task 7
-                        statusCode = 200,             // Task 7
+                        responseBody = responseRef,
+                        statusCode = ReturnTypeUnwrapper.statusCodeFor(method, unwrapped),
                     )
                 }
             }

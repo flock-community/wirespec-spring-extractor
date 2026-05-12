@@ -23,7 +23,7 @@ tasks.test {
     // The fixture builds need our just-built plugin to be discoverable in a
     // local Maven repo. Publish it into a project-local repo (NOT ~/.m2) so
     // we don't pollute the user's environment and tests stay reproducible.
-    dependsOn(":plugin:publishMavenPublicationToItLocalRepository")
+    dependsOn(":extractor-maven-plugin:publishMavenPublicationToItLocalRepository")
 
     systemProperty("it.pluginVersion", project.version.toString())
     systemProperty("it.repo", itRepoDir.get().asFile.absolutePath)

@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-include(":plugin")
+include(":extractor-maven-plugin")
 include(":integration-tests")

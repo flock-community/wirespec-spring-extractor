@@ -253,6 +253,12 @@ wirespec-spring-extractor/
                 </executions>
                 <configuration>
                     <jvmTarget>21</jvmTarget>
+                    <args>
+                        <!-- Required so Parameter.getName() returns real names instead of arg0/arg1.
+                             Spring's @PathVariable/@RequestParam/etc. accept empty value() and fall
+                             back to the parameter name; without this flag those fall back to "arg0". -->
+                        <arg>-java-parameters</arg>
+                    </args>
                 </configuration>
             </plugin>
 

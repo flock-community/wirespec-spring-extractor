@@ -18,6 +18,8 @@ open class TypeExtractor {
 
     private val cache = mutableMapOf<String, WireType>()
     protected val _definitions = linkedSetOf<WireType>()
+    /** Tracks which simple name has been claimed by which FQN to detect cross-package collisions. */
+    private val usedNames = mutableMapOf<String, String>()  // simpleName -> fqn that claimed it
 
     val definitions: Set<WireType> get() = _definitions
 
@@ -32,6 +34,27 @@ open class TypeExtractor {
         else                 -> WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
     }
 
+    /**
+     * Returns a unique name for [cls], disambiguating with a numeric suffix when two classes
+     * from different packages share the same simple name (e.g. com.a.User and com.b.User → "User", "User2").
+     */
+    private fun nameFor(cls: Class<*>): String {
+        val simple = cls.simpleName
+        val existing = usedNames[simple]
+        return when {
+            existing == null -> { usedNames[simple] = cls.name; simple }
+            existing == cls.name -> simple
+            else -> {
+                // collision — find or assign a numeric suffix
+                var i = 2
+                while (usedNames["$simple$i"] != null && usedNames["$simple$i"] != cls.name) i++
+                val newName = "$simple$i"
+                if (usedNames[newName] == null) usedNames[newName] = cls.name
+                newName
+            }
+        }
+    }
+
     private fun fromClass(cls: Class<*>, nullable: Boolean): WireType {
         primitiveOf(cls)?.let { return it.copy(nullable = nullable) }
         if (cls == String::class.java) return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
@@ -39,11 +62,12 @@ open class TypeExtractor {
         if (cls == UUID::class.java) return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         if (Enum::class.java.isAssignableFrom(cls)) {
             cache[cls.name]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
-            val ref = WireType.Ref(cls.simpleName, nullable)
+            val name = nameFor(cls)
+            val ref = WireType.Ref(name, nullable)
             cache[cls.name] = ref.copy(nullable = false)
             @Suppress("UNCHECKED_CAST")
             val values = (cls.enumConstants as Array<Enum<*>>).map { it.name }
-            _definitions += WireType.EnumDef(cls.simpleName, values)
+            _definitions += WireType.EnumDef(name, values)
             return ref
         }
         if (Collection::class.java.isAssignableFrom(cls)) {
@@ -51,10 +75,11 @@ open class TypeExtractor {
         }
         // Object class — register and recurse into its fields.
         cache[cls.name]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
-        val ref = WireType.Ref(cls.simpleName, nullable)
+        val name = nameFor(cls)
+        val ref = WireType.Ref(name, nullable)
         cache[cls.name] = ref.copy(nullable = false)
         val fields = walkFields(cls)
-        _definitions += WireType.Object(cls.simpleName, fields)
+        _definitions += WireType.Object(name, fields)
         return ref
     }
 

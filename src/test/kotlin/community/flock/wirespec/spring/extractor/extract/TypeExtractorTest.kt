@@ -4,6 +4,7 @@ import community.flock.wirespec.spring.extractor.fixtures.dto.Container
 import community.flock.wirespec.spring.extractor.fixtures.dto.Role
 import community.flock.wirespec.spring.extractor.fixtures.dto.UserDto
 import community.flock.wirespec.spring.extractor.model.WireType
+import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
@@ -79,6 +80,17 @@ class TypeExtractorTest {
         extractor.extract(community.flock.wirespec.spring.extractor.fixtures.dto.JacksonDto::class.java)
         val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "JacksonDto" } as WireType.Object
         obj.fields.map { it.name } shouldBe listOf("user_id", "visible")
+    }
+
+    @Test
+    fun `two classes with same simple name across packages get disambiguated names`() {
+        val freshExtractor = TypeExtractor()
+        val r1 = freshExtractor.extract(community.flock.wirespec.spring.extractor.fixtures.dto.clashA.Conflict::class.java)
+        val r2 = freshExtractor.extract(community.flock.wirespec.spring.extractor.fixtures.dto.clashB.Conflict::class.java)
+        (r1 as WireType.Ref).name shouldBe "Conflict"
+        (r2 as WireType.Ref).name shouldBe "Conflict2"
+        val names = freshExtractor.definitions.filterIsInstance<WireType.Object>().map { it.name }
+        names shouldContainAll listOf("Conflict", "Conflict2")
     }
 
     @Test

@@ -81,16 +81,33 @@ open class TypeExtractor {
     protected open fun walkFields(cls: Class<*>): List<WireType.Field> {
         val members = propertyMembers(cls)
         return members.mapNotNull { (name, type) ->
-            val element = cls.declaredFieldOrNull(name) ?: cls
+            val field = cls.declaredFieldOrNull(name)
+            val element: java.lang.reflect.AnnotatedElement = field ?: cls
             if (JacksonNames.isIgnored(element)) return@mapNotNull null
-            val rawType = extractInner(type, nullable = false)
+
+            val declaredClass = (type as? Class<*>) ?: ((type as? java.lang.reflect.ParameterizedType)?.rawType as? Class<*>) ?: Any::class.java
+            val nullable = NullabilityResolver.isNullable(element, declaredClass)
+
+            val rawType = withNullability(extractInner(type, nullable = false), nullable)
             val refined = ValidationConstraints.refine(element, rawType)
             if (refined is WireType.Refined) _definitions += refined
+
             WireType.Field(
                 name = JacksonNames.effectiveName(element, original = name),
-                type = if (refined is WireType.Refined) WireType.Ref(refined.name) else refined,
+                type = if (refined is WireType.Refined) WireType.Ref(refined.name, nullable) else refined,
+                description = NullabilityResolver.schemaDescription(element),
             )
         }
+    }
+
+    private fun withNullability(t: WireType, nullable: Boolean): WireType = when (t) {
+        is WireType.Primitive -> t.copy(nullable = nullable)
+        is WireType.Ref       -> t.copy(nullable = nullable)
+        is WireType.ListOf    -> t.copy(nullable = nullable)
+        is WireType.MapOf     -> t.copy(nullable = nullable)
+        is WireType.Object    -> t.copy(nullable = nullable)
+        is WireType.EnumDef   -> t.copy(nullable = nullable)
+        is WireType.Refined   -> t.copy(nullable = nullable)
     }
 
     private fun Class<*>.declaredFieldOrNull(name: String): java.lang.reflect.Field? =

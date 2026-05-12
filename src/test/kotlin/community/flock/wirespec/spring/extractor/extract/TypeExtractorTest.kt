@@ -80,4 +80,15 @@ class TypeExtractorTest {
         val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "JacksonDto" } as WireType.Object
         obj.fields.map { it.name } shouldBe listOf("user_id", "visible")
     }
+
+    @Test
+    fun `SchemaDto fields combine nullability, validation, and description`() {
+        extractor.extract(community.flock.wirespec.spring.extractor.fixtures.dto.SchemaDto::class.java)
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "SchemaDto" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["name"]!!.description shouldBe "The user's display name"
+        byName["name"]!!.type.nullable shouldBe false
+        byName["nullable"]!!.type.nullable shouldBe true
+        byName["notNullablePrimitive"]!!.type.nullable shouldBe false
+    }
 }

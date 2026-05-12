@@ -1,4 +1,4 @@
-package community.flock.wirespec.spring.extractor
+package community.flock.wirespec.spring.extractor.maven
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

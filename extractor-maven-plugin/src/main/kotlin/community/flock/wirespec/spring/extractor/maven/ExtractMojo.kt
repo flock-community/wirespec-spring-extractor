@@ -1,5 +1,8 @@
-package community.flock.wirespec.spring.extractor
+package community.flock.wirespec.spring.extractor.maven
 
+import community.flock.wirespec.spring.extractor.ExtractConfig
+import community.flock.wirespec.spring.extractor.WirespecExtractor
+import community.flock.wirespec.spring.extractor.WirespecExtractorException
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugins.annotations.LifecyclePhase
@@ -30,6 +33,8 @@ class ExtractMojo : AbstractMojo() {
         val runtimeClasspath: List<File> = try {
             project.runtimeClasspathElements.orEmpty().map(::File)
         } catch (_: Exception) {
+            // DependencyResolutionRequiredException in unit-test contexts where
+            // dependency resolution hasn't run; tolerate it and use empty classpath.
             emptyList()
         }
 

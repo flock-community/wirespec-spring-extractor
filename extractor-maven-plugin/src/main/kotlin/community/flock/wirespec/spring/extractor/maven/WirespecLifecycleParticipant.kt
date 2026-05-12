@@ -1,4 +1,4 @@
-package community.flock.wirespec.spring.extractor
+package community.flock.wirespec.spring.extractor.maven
 
 import org.apache.maven.AbstractMavenLifecycleParticipant
 import org.apache.maven.execution.MavenSession

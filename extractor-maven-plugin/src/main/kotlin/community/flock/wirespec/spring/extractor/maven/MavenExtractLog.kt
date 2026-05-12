@@ -1,4 +1,6 @@
-package community.flock.wirespec.spring.extractor
+package community.flock.wirespec.spring.extractor.maven
+
+import community.flock.wirespec.spring.extractor.ExtractLog
 
 /**
  * Adapts Maven's plugin [org.apache.maven.plugin.logging.Log] to core's

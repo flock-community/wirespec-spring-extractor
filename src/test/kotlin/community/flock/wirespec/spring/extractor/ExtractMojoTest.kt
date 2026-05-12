@@ -3,6 +3,9 @@ package community.flock.wirespec.spring.extractor
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+import java.nio.file.Path
 
 class ExtractMojoTest {
 
@@ -21,5 +24,20 @@ class ExtractMojoTest {
         val collisions = detectControllerCollisions(listOf(a, a))
         collisions.keys shouldContainExactly setOf("HelloController")
         collisions["HelloController"]!!.size shouldBe 2
+    }
+
+    @Test
+    fun `effectiveBasePackage strips blank values`() {
+        effectiveBasePackage("") shouldBe null
+        effectiveBasePackage("   ") shouldBe null
+        effectiveBasePackage(null) shouldBe null
+        effectiveBasePackage("com.acme") shouldBe "com.acme"
+    }
+
+    @Test
+    fun `assertOutputWritable on a writable temp dir succeeds`(@TempDir tmp: Path) {
+        val target = File(tmp.toFile(), "does/not/exist/yet")
+        // should NOT throw — tmp itself is writable
+        assertOutputWritable(target)
     }
 }

@@ -301,4 +301,80 @@ class TypeExtractorTest {
         val inner = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoWrapper" } as WireType.Object
         inner.fields.single { it.name == "value" }.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
     }
+
+    @Test
+    fun `ApiResponse of List of UserDto flattens to UserDtoListApiResponse with ListOf data field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfList").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoListApiResponse"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoListApiResponse" } as WireType.Object
+        val data = obj.fields.single { it.name == "data" }
+        val list = data.type.shouldBeInstanceOf<WireType.ListOf>()
+        list.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+
+        // The bare List<UserDto> does NOT register a UserDtoList definition at use site —
+        // only the wrapper's name carries the "List" suffix.
+        extractor.definitions.map { definitionName(it) } shouldNotContain "UserDtoList"
+    }
+
+    @Test
+    fun `ApiResponse of Map of String to UserDto flattens to UserDtoMapApiResponse with MapOf data field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfMap").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoMapApiResponse"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoMapApiResponse" } as WireType.Object
+        val data = obj.fields.single { it.name == "data" }
+        val map = data.type.shouldBeInstanceOf<WireType.MapOf>()
+        map.value.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+    }
+
+    @Test
+    fun `List of Page of UserDto at use site stays native ListOf with flattened element`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("listOfPage").genericType
+
+        val out = extractor.extract(type)
+        val list = out.shouldBeInstanceOf<WireType.ListOf>()
+        list.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        // The use-site List does NOT emit a UserDtoPageList wrapper.
+        extractor.definitions.map { definitionName(it) } shouldNotContain "UserDtoPageList"
+    }
+
+    @Test
+    fun `same instantiation reached twice produces one definition`() {
+        val freshExtractor = TypeExtractor()
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+
+        freshExtractor.extract(type)
+        freshExtractor.extract(type)
+
+        val count = freshExtractor.definitions.count { (it as? WireType.Object)?.name == "UserDtoPage" }
+        count shouldBe 1
+    }
+
+    @Test
+    fun `distinct flattened instantiations are each registered`() {
+        val freshExtractor = TypeExtractor()
+        val userPage = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+        val arOfList = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfList").genericType
+        val arOfMap = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfMap").genericType
+
+        freshExtractor.extract(userPage)
+        freshExtractor.extract(arOfList)
+        freshExtractor.extract(arOfMap)
+
+        val names = freshExtractor.definitions.map { definitionName(it) }.toSet()
+        names shouldContainAll listOf("UserDtoPage", "UserDtoListApiResponse", "UserDtoMapApiResponse")
+    }
 }

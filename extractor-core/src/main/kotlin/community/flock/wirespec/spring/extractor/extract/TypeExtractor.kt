@@ -310,15 +310,30 @@ open class TypeExtractor {
                 val pushed = if (i > 0) {
                     val descendant = chain[i - 1]
                     val gen = descendant.genericSuperclass
-                    if (gen is ParameterizedType) {
-                        val parentRaw = gen.rawType as Class<*>
-                        @Suppress("UNCHECKED_CAST")
-                        val frame = parentRaw.typeParameters
-                            .zip(gen.actualTypeArguments)
-                            .toMap() as Map<TypeVariable<*>, Type>
-                        bindings.addFirst(frame)
-                        true
-                    } else false
+                    val rawSuper = descendant.superclass
+                    when {
+                        gen is ParameterizedType -> {
+                            val parentRaw = gen.rawType as Class<*>
+                            @Suppress("UNCHECKED_CAST")
+                            val frame = parentRaw.typeParameters
+                                .zip(gen.actualTypeArguments)
+                                .toMap() as Map<TypeVariable<*>, Type>
+                            bindings.addFirst(frame)
+                            true
+                        }
+                        rawSuper != null
+                            && rawSuper != Any::class.java
+                            && rawSuper != Object::class.java
+                            && rawSuper.typeParameters.isNotEmpty() -> {
+                            // class X extends Page  (raw): inherited type vars would
+                            // collapse silently. Reject.
+                            throw WirespecExtractorException.rawGenericSuperclass(
+                                subclassName = descendant.simpleName,
+                                rawSuperclassName = rawSuper.simpleName,
+                            )
+                        }
+                        else -> false
+                    }
                 } else false
                 pushedFrames.add(pushed)
 

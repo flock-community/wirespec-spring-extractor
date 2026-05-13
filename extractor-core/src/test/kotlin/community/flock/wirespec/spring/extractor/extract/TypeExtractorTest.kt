@@ -364,6 +364,15 @@ class TypeExtractorTest {
     }
 
     @Test
+    fun `extracting a class that extends a raw generic parent fails with a clear error`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.RawSuperPage::class.java)
+        }
+        ex.message!! shouldContainString "RawSuperPage extends generic Page"
+        ex.message!! shouldContainString "Page<UserDto>"
+    }
+
+    @Test
     fun `extracting a generic with a wildcard argument fails with a clear error`() {
         val type = community.flock.wirespec.spring.extractor.fixtures.generic.BadControllers::class.java
             .getDeclaredField("wildcardPage").genericType

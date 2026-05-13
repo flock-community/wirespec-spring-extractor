@@ -120,6 +120,36 @@ writes `.ws` files into `build/wirespec/`. To trigger it directly:
   `@JsonIgnore`), Bean Validation (`@NotNull`, `@Size`, `@Pattern`, `@Min`,
   `@Max`), and springdoc `@Schema` awareness
 
+### Generic types
+
+Wirespec has no concept of generic type parameters. The extractor flattens
+every concrete generic instantiation it encounters into its own named
+wirespec type with the type arguments substituted:
+
+| Java/Kotlin                  | Wirespec                                       |
+| ---------------------------- | ---------------------------------------------- |
+| `Page<UserDto>`              | `type UserDtoPage`                             |
+| `Wrapper<Int>`               | `type IntegerWrapper`                          |
+| `Pair<UserDto, OrderDto>`    | `type UserDtoOrderDtoPair`                     |
+| `Page<Wrapper<UserDto>>`     | `type UserDtoWrapper`, `type UserDtoWrapperPage` |
+| `ApiResponse<List<UserDto>>` | `type UserDtoListApiResponse`                  |
+
+Names are composed by reading type arguments innermost-first then the generic
+class's simple name. `List` and `Map` are wirespec-native containers: they
+stay as `T[]` and `{T}` at use sites and only contribute a `List` / `Map`
+suffix when they appear inside another generic's type arguments.
+
+The extractor fails the build (with a pointer to the offending controller
+method) when it encounters:
+
+- a raw generic at a reference site (`fun list(): Page` — no type argument),
+- a wildcard argument (`Page<*>`, `Page<?>`),
+- a class extending a generic parent without arguments
+  (`class UserPage : Page`).
+
+This monomorphization rule means controller signatures must always bind
+their generic parameters concretely.
+
 ### Known limitations (v1)
 
 - `@Controller` classes with handler methods directly annotated with

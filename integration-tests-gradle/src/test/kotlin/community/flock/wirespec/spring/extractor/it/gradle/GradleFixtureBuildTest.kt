@@ -103,54 +103,48 @@ class GradleFixtureBuildTest {
         assertTrue(wsDir.isDirectory) { "wirespec output dir missing at ${wsDir.absolutePath}" }
 
         val files = wsDir.listFiles()!!.map { it.name }.sorted()
-        files.shouldContainExactly("UserController.ws", "types.ws")
+        files.shouldContainExactly("AdminController.ws", "UserController.ws", "types.ws")
 
         val controller = File(wsDir, "UserController.ws").readText()
         controller shouldContain "endpoint GetUser GET /users/{id"
         controller shouldContain "endpoint CreateUser POST"
-
-        // Suspend endpoints: response type recovered from the Continuation type
-        // argument, not emitted as `Object`/`String`/missing.
         controller shouldMatch Regex("(?s).*endpoint ListUsers GET /users\\b.*")
         controller shouldMatch Regex("(?s).*200 -> UserDto\\[].*")
         controller shouldMatch Regex("(?s).*endpoint DeleteUser DELETE /users/\\{id.*")
         controller shouldMatch Regex("(?s).*204 -> Unit.*")
+        controller shouldContain "type UserDto"
+
+        controller shouldMatch Regex("(?s).*id\\s*:\\s*String\\b(?!\\?).*")
+        controller shouldMatch Regex("(?s).*nickname\\s*:\\s*String\\?.*")
+        controller shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\b(?!\\?).*")
+        controller shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\b(?!\\?).*")
+        controller shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\b(?!\\?).*")
+        controller shouldMatch Regex("(?s).*balance\\s*:\\s*String\\b(?!\\?).*")
+        controller shouldContain "`_internalId`"
+        controller shouldContain "`SystemKey`"
+        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(controller)) {
+            "_internalId appears un-backticked at line start in UserController.ws:\n$controller"
+        }
+
+        val admin = File(wsDir, "AdminController.ws").readText()
+        admin shouldContain "endpoint ListByRole GET /admins/by-role"
 
         val types = File(wsDir, "types.ws").readText()
-        types shouldContain "type UserDto"
         types shouldContain "Role"
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(types)) {
+            "UserDto leaked into types.ws despite having a single owner:\n$types"
+        }
 
-        // Kotlin nullability path: data class non-null properties stay non-null,
-        // explicitly `String?` becomes nullable. (Java records come out all-nullable.)
-        types shouldMatch Regex("(?s).*id\\s*:\\s*String\\b(?!\\?).*")
-        types shouldMatch Regex("(?s).*nickname\\s*:\\s*String\\?.*")
-
-        // JDK value types must be filtered to `String` rather than expanded as
-        // nested Wirespec types.
-        types shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\b(?!\\?).*")
-        types shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\b(?!\\?).*")
-        types shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\b(?!\\?).*")
-        types shouldMatch Regex("(?s).*balance\\s*:\\s*String\\b(?!\\?).*")
-
-        // JDK class names must not leak as Wirespec definitions.
+        val combined = controller + "\n" + types + "\n" + admin
         listOf("LocalDateTime", "Instant", "ZoneOffset", "BigDecimal", "LocalDate", "ZonedDateTime").forEach { jdk ->
-            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(types)) {
-                "JDK type $jdk leaked into types.ws:\n$types"
+            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(combined)) {
+                "JDK type $jdk leaked into a .ws file:\n$combined"
             }
         }
-
-        // Kotlin coroutine machinery must never appear as Wirespec types.
         listOf("Continuation", "CoroutineContext").forEach { ktInternal ->
-            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$ktInternal\\b").containsMatchIn(types)) {
-                "Kotlin coroutine type $ktInternal leaked into types.ws:\n$types"
+            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$ktInternal\\b").containsMatchIn(combined)) {
+                "Kotlin coroutine type $ktInternal leaked into a .ws file:\n$combined"
             }
-        }
-
-        // Field names starting with `_` or an uppercase letter must be backticked.
-        types shouldContain "`_internalId`"
-        types shouldContain "`SystemKey`"
-        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(types)) {
-            "_internalId appears un-backticked at line start:\n$types"
         }
     }
 
@@ -159,36 +153,36 @@ class GradleFixtureBuildTest {
         assertTrue(wsDir.isDirectory) { "wirespec output dir missing at ${wsDir.absolutePath}" }
 
         val files = wsDir.listFiles()!!.map { it.name }.sorted()
-        files.shouldContainExactly("UserController.ws", "types.ws")
+        files.shouldContainExactly("AdminController.ws", "UserController.ws", "types.ws")
 
         val controller = File(wsDir, "UserController.ws").readText()
         controller shouldContain "endpoint GetUser GET /users/{id"
         controller shouldContain "endpoint CreateUser POST"
-
-        val types = File(wsDir, "types.ws").readText()
-        types shouldContain "type UserDto"
-        types shouldContain "Role"
-
-        // JDK value types must be filtered to `String` — never emitted as nested
-        // Wirespec types. (Java records produce all-nullable fields, so the
-        // expected form is `: String?`.)
-        types shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\??.*")
-        types shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\??.*")
-        types shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\??.*")
-        types shouldMatch Regex("(?s).*balance\\s*:\\s*String\\??.*")
-
-        // JDK class names must not leak as Wirespec definitions.
-        listOf("LocalDateTime", "Instant", "ZoneOffset", "BigDecimal", "LocalDate", "ZonedDateTime").forEach { jdk ->
-            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(types)) {
-                "JDK type $jdk leaked into types.ws:\n$types"
-            }
+        controller shouldContain "type UserDto"
+        controller shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\??.*")
+        controller shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\??.*")
+        controller shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\??.*")
+        controller shouldMatch Regex("(?s).*balance\\s*:\\s*String\\??.*")
+        controller shouldContain "`_internalId`"
+        controller shouldContain "`SystemKey`"
+        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(controller)) {
+            "_internalId appears un-backticked at line start in UserController.ws:\n$controller"
         }
 
-        // Field names starting with `_` or an uppercase letter must be backticked.
-        types shouldContain "`_internalId`"
-        types shouldContain "`SystemKey`"
-        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(types)) {
-            "_internalId appears un-backticked at line start:\n$types"
+        val admin = File(wsDir, "AdminController.ws").readText()
+        admin shouldContain "endpoint ListByRole GET /admins/by-role"
+
+        val types = File(wsDir, "types.ws").readText()
+        types shouldContain "Role"
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(types)) {
+            "UserDto leaked into types.ws despite having a single owner:\n$types"
+        }
+
+        val combined = controller + "\n" + types + "\n" + admin
+        listOf("LocalDateTime", "Instant", "ZoneOffset", "BigDecimal", "LocalDate", "ZonedDateTime").forEach { jdk ->
+            assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(combined)) {
+                "JDK type $jdk leaked into a .ws file:\n$combined"
+            }
         }
     }
 

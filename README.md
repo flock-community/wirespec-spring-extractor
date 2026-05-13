@@ -131,7 +131,9 @@ for the full design and current scope limitations.
 
 ## Output layout
 
-- One `<ControllerName>.ws` per controller (endpoints)
-- One shared `types.ws` (all referenced DTO types)
+- One `<ControllerName>.ws` per controller — endpoints, plus DTO/enum/refined
+  types referenced only by that controller.
+- One shared `types.ws` — DTO/enum/refined types referenced by two or more
+  controllers. Omitted when all types are controller-local.
 - The output directory is treated as a generated artifact: existing `*.ws`
   files are deleted on each run; non-`.ws` files are left alone.

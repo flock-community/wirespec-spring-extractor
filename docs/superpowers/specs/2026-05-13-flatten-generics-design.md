@@ -98,10 +98,16 @@ Same rules as for any other type.
 ### State extensions inside `TypeExtractor`
 
 - **Cache key.** The existing `cache: MutableMap<String, WireType>` (keyed by
-  `cls.name`) becomes keyed by a *fingerprint*: the raw class FQN plus a
-  recursively-resolved fingerprint of each type argument. `Page<UserDto>` and
-  `Page<OrderDto>` are distinct cache entries; the same `Page<UserDto>`
-  reached twice returns the same `Ref`.
+  `cls.name`, the raw FQN) becomes keyed by a *fingerprint string* built
+  recursively from FQNs, not display names. For a non-generic class the
+  fingerprint is its FQN. For a parameterized type it is
+  `<rawFqn>(<arg1Fingerprint>,<arg2Fingerprint>,…)`; for a `Collection<E>`
+  it is `java.util.List(<eFingerprint>)`; for a `Map<K, V>` it is
+  `java.util.Map(<vFingerprint>)` (key omitted to match wirespec's
+  `MapOf(V)` model). FQN-based keys keep cache lookup stable even when the
+  composed display name is later disambiguated by `nameFor()` (so
+  `UserDtoPage` and `UserDtoPage2` arising from a collision do not confuse
+  the cache).
 - **Bindings stack.** A new `private val bindings = ArrayDeque<Map<TypeVariable<*>, Type>>()`
   tracks the current substitution context. A frame is pushed before walking a
   parameterized type's fields (or a generic superclass's inherited fields)
@@ -218,18 +224,29 @@ parameterized parent (`class UserPage : Page<UserDto>()`) is extracted under
 its own simple name `UserPage`. To resolve inherited fields from `Page<T>`,
 extend the field-discovery path:
 
-- After walking `cls.declaredFields` / record components, inspect
-  `cls.genericSuperclass`.
-- If it is a `ParameterizedType`, push a binding frame for the
-  superclass's type variables (`Page`'s `T` ↦ `UserDto`) and recursively
-  walk *its* declared members.
-- If it is a non-generic class or `Object.class`, stop.
-- If it is a raw generic (`extends Page` without args), hard error
-  (case 4 below).
+- Walk inherited members first, recursing up the chain (grandparent, parent,
+  then self), then append `cls.declaredFields` / record components last.
+  This matches the conventional Jackson serialization order — parent fields
+  precede child fields in the emitted `Object` — and gives a stable,
+  predictable order in the generated `.ws`.
+- For each step up the chain, inspect `cls.genericSuperclass`:
+  - If it is a `ParameterizedType`, push a binding frame for the
+    superclass's type variables (`Page`'s `T` ↦ `UserDto`) and recurse.
+  - If it is a non-generic class, recurse with no new bindings until
+    `Object.class`, then stop.
+  - If it is a raw generic (`extends Page` without args), hard error
+    (case 4 below).
+- Field name collisions between parent and child (child shadowing parent)
+  resolve to the child's declaration — the child's `declaredFields` entry
+  wins. The parent's same-named field is omitted from the output. This
+  matches both JVM field-shadowing semantics and Jackson's default
+  behavior.
 
 The JavaBean path (`cls.methods`) already sees inherited getters, so for
-pure-bean styles this is largely already correct; the change matters for
-Kotlin data classes and Java records that lean on declared fields.
+pure-bean styles much of this is already implicit; the explicit superclass
+walk matters for Kotlin data classes and Java records that lean on declared
+fields, and is what makes the type-variable resolution (`Page<T>`'s `T` ↦
+`UserDto`) actually take effect for inherited members.
 
 **Recursion safety.** Self-referential generics like
 `class Tree<T>(val children: List<Tree<T>>)` reached as `Tree<UserDto>` are
@@ -258,10 +275,15 @@ plugin error reporting and `ExtractLog`. No silent fallbacks.
    <controller>.<method> cannot be flattened; replace with a concrete type.`
 
 3. **Unbound type variable during field walk.** A field's type is a
-   `TypeVariable` that does not resolve through the bindings stack.
+   `TypeVariable` that does not resolve through the bindings stack. In
+   normal use this is unreachable — the gate at the entry of
+   `fromParameterized` (case 1) and the wildcard check (case 2) filter out
+   every user-facing path that could leave a variable unbound. Case 3
+   exists as a defensive check that fires only on an internal bug (a frame
+   that was supposed to be pushed wasn't, or shadowing was mis-handled).
    Message: `Type variable T in <Class>.<field> is not bound at the
-   reference reached from <controller>.<method>; the extractor cannot
-   produce a concrete wirespec type.`
+   reference reached from <controller>.<method>; this indicates an
+   extractor bug — please report.`
 
 4. **Generic superclass missing arguments.** Class extends a generic parent
    raw (`class UserPage : Page`).

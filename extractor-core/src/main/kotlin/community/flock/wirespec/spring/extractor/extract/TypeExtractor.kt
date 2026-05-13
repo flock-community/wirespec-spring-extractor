@@ -240,27 +240,93 @@ open class TypeExtractor {
      */
     private fun currentContext(): String = "<unknown>"
 
-    /** Override-able by subclasses (Tasks 9-12) to inject Jackson/Validation/Schema processing. */
+    /**
+     * Walk the inheritance chain of [cls] producing one [WireType.Field] per
+     * (non-ignored, non-shadowed) property, parent-first. When a level's
+     * declared superclass is parameterized, the corresponding type-variable
+     * bindings are pushed onto [bindings] *before* the parent's fields are
+     * extracted, and popped after. This keeps inherited-field T-references
+     * resolving correctly (e.g., UserPage : Page<UserDto> resolves `content: T`
+     * to `UserDto`).
+     *
+     * Override-able by subclasses to inject extra processing per level.
+     */
     protected open fun walkFields(cls: Class<*>): List<WireType.Field> {
-        val members = propertyMembers(cls)
-        return members.mapNotNull { (name, type) ->
-            val field = cls.declaredFieldOrNull(name)
-            val element: java.lang.reflect.AnnotatedElement = field ?: cls
-            if (JacksonNames.isIgnored(element)) return@mapNotNull null
-
-            val declaredClass = (type as? Class<*>) ?: ((type as? java.lang.reflect.ParameterizedType)?.rawType as? Class<*>) ?: Any::class.java
-            val nullable = NullabilityResolver.isNullable(element, declaredClass)
-
-            val rawType = withNullability(extractInner(type, nullable = false), nullable)
-            val refined = ValidationConstraints.refine(element, rawType)
-            if (refined is WireType.Refined) _definitions += refined
-
-            WireType.Field(
-                name = JacksonNames.effectiveName(element, original = name),
-                type = if (refined is WireType.Refined) WireType.Ref(refined.name, nullable) else refined,
-                description = NullabilityResolver.schemaDescription(element),
-            )
+        // chain[0] = leaf, chain[chain.size - 1] = topmost non-Object ancestor
+        val chain = mutableListOf<Class<*>>()
+        var c: Class<*>? = cls
+        while (c != null && c != Any::class.java && c != Object::class.java) {
+            chain.add(c)
+            c = c.superclass
         }
+
+        // Pre-compute shadowing: names declared by any descendant of level i
+        // (descendants are chain[0..i-1] in leaf-first order).
+        val perLevelNames = chain.map { propertyMembers(it).map { p -> p.first }.toSet() }
+        val shadowedAt = Array(chain.size) { i ->
+            val s = mutableSetOf<String>()
+            for (j in 0 until i) s.addAll(perLevelNames[j])
+            s
+        }
+
+        // Walk root-to-leaf so parent fields appear first in the output.
+        // Push binding frames as we descend (chain[i+1]'s genericSuperclass binds chain[i]'s
+        // type parameters — but with our chain ordering, the leaf is chain[0], its parent is
+        // chain[1], so descending root-to-leaf means iterating chain[size-1] down to chain[0].
+        // The frame to push BEFORE processing chain[i] comes from chain[i-1].genericSuperclass.
+        val pushedFrames = mutableListOf<Boolean>()
+        val out = mutableListOf<WireType.Field>()
+        val seen = mutableSetOf<String>()
+
+        try {
+            for (i in chain.indices.reversed()) {
+                val level = chain[i]
+                // If this level has a deeper descendant (chain[i-1] in leaf-first order, i.e.,
+                // smaller index), push the frame from THAT descendant's genericSuperclass.
+                // I.e., for chain = [UserPage(0), Page(1)], processing Page (i=1):
+                //   descendant = chain[0] = UserPage, its genericSuperclass is Page<UserDto>.
+                //   Push {Page.T: UserDto}.
+                val pushed = if (i > 0) {
+                    val descendant = chain[i - 1]
+                    val gen = descendant.genericSuperclass
+                    if (gen is ParameterizedType) {
+                        val parentRaw = gen.rawType as Class<*>
+                        @Suppress("UNCHECKED_CAST")
+                        val frame = parentRaw.typeParameters
+                            .zip(gen.actualTypeArguments)
+                            .toMap() as Map<TypeVariable<*>, Type>
+                        bindings.addFirst(frame)
+                        true
+                    } else false
+                } else false
+                pushedFrames.add(pushed)
+
+                for ((name, type) in propertyMembers(level)) {
+                    if (name in shadowedAt[i]) continue
+                    if (!seen.add(name)) continue
+                    val field = level.declaredFieldOrNull(name)
+                    val element: java.lang.reflect.AnnotatedElement = field ?: level
+                    if (JacksonNames.isIgnored(element)) continue
+
+                    val declaredClass = (type as? Class<*>) ?: ((type as? ParameterizedType)?.rawType as? Class<*>) ?: Any::class.java
+                    val nullable = NullabilityResolver.isNullable(element, declaredClass)
+
+                    val rawType = withNullability(extractInner(type, nullable = false), nullable)
+                    val refined = ValidationConstraints.refine(element, rawType)
+                    if (refined is WireType.Refined) _definitions += refined
+
+                    out += WireType.Field(
+                        name = JacksonNames.effectiveName(element, original = name),
+                        type = if (refined is WireType.Refined) WireType.Ref(refined.name, nullable) else refined,
+                        description = NullabilityResolver.schemaDescription(element),
+                    )
+                }
+            }
+        } finally {
+            for (pushed in pushedFrames.reversed()) if (pushed) bindings.removeFirst()
+        }
+
+        return out
     }
 
     private fun withNullability(t: WireType, nullable: Boolean): WireType = when (t) {

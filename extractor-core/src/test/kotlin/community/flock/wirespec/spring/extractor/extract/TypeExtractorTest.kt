@@ -361,6 +361,28 @@ class TypeExtractorTest {
     }
 
     @Test
+    fun `UserPage subclass of Page of UserDto extracts to Ref UserPage with inherited fields substituted`() {
+        val ref = extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.UserPage::class.java)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserPage"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserPage" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+
+        // Inherited fields, parent-first ordering.
+        byName["content"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["totalElements"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_64)
+        byName["number"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+
+        // Own field.
+        byName["pageLabel"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+
+        // Field ordering: parent fields first, then declared.
+        val parentFields = listOf("content", "totalElements", "number")
+        val ownFields = listOf("pageLabel")
+        obj.fields.map { it.name } shouldBe parentFields + ownFields
+    }
+
+    @Test
     fun `Tree of UserDto flattens to UserDtoTree without infinite recursion`() {
         val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
             .getDeclaredField("userDtoTree").genericType

@@ -1,15 +1,19 @@
 package community.flock.wirespec.spring.extractor.extract
 
+import community.flock.wirespec.spring.extractor.WirespecExtractorException
 import community.flock.wirespec.spring.extractor.fixtures.dto.Container
 import community.flock.wirespec.spring.extractor.fixtures.dto.Role
 import community.flock.wirespec.spring.extractor.fixtures.dto.TemporalDto
 import community.flock.wirespec.spring.extractor.fixtures.dto.UserDto
 import community.flock.wirespec.spring.extractor.model.WireType
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain as shouldContainString
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.URI
@@ -76,10 +80,26 @@ class TypeExtractorTest {
     }
 
     @Test
-    fun `unbound generic ParameterizedType resolves to ListOf STRING with warning`() {
-        val type = Container::class.java.getDeclaredField("items").genericType
-        val out = extractor.extract(type)
-        out.shouldBeInstanceOf<WireType.ListOf>().element shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    fun `extracting raw Container fails because it declares type parameters`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(Container::class.java)
+        }
+        ex.message!! shouldContainString "Cannot extract raw generic type Container"
+    }
+
+    @Test
+    fun `Container of UserDto flattens to UserDtoContainer with substituted fields`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoContainer").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoContainer"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoContainer" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        val items = byName["items"]!!.type.shouldBeInstanceOf<WireType.ListOf>()
+        items.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["first"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
     }
 
     @Test
@@ -220,5 +240,253 @@ class TypeExtractorTest {
         byName["name"]!!.type.nullable shouldBe false
         byName["nullable"]!!.type.nullable shouldBe true
         byName["notNullablePrimitive"]!!.type.nullable shouldBe false
+    }
+
+    @Test
+    fun `Page of UserDto flattens to UserDtoPage with substituted fields`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoPage" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+
+        byName["content"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["totalElements"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_64)
+        byName["number"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+
+        // The raw generic class is NOT registered.
+        val defNames = extractor.definitions.map { definitionName(it) }.toSet()
+        defNames shouldNotContain "Page"
+    }
+
+    @Test
+    fun `Wrapper of Int flattens to IntegerWrapper with INTEGER_32 value field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("intWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "IntegerWrapper"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "IntegerWrapper" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+    }
+
+    @Test
+    fun `Wrapper of String flattens to StringWrapper`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("stringWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "StringWrapper"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "StringWrapper" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `Pair2 of UserDto and Role flattens to UserDtoRolePair2 with both fields substituted`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("pairUserOrder").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoRolePair2"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoRolePair2" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["first"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["second"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "Role"
+    }
+
+    @Test
+    fun `Page of Wrapper of UserDto flattens innermost first to UserDtoWrapperPage`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("nestedPageOfWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoWrapperPage"
+
+        val names = extractor.definitions.map { definitionName(it) }.toSet()
+        names shouldContain "UserDtoWrapper"
+        names shouldContain "UserDtoWrapperPage"
+
+        val outer = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoWrapperPage" } as WireType.Object
+        outer.fields.single { it.name == "content" }.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoWrapper"
+
+        val inner = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoWrapper" } as WireType.Object
+        inner.fields.single { it.name == "value" }.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+    }
+
+    @Test
+    fun `ApiResponse of List of UserDto flattens to UserDtoListApiResponse with ListOf data field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfList").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoListApiResponse"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoListApiResponse" } as WireType.Object
+        val data = obj.fields.single { it.name == "data" }
+        val list = data.type.shouldBeInstanceOf<WireType.ListOf>()
+        list.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+
+        // The bare List<UserDto> does NOT register a UserDtoList definition at use site —
+        // only the wrapper's name carries the "List" suffix.
+        extractor.definitions.map { definitionName(it) } shouldNotContain "UserDtoList"
+    }
+
+    @Test
+    fun `ApiResponse of Map of String to UserDto flattens to UserDtoMapApiResponse with MapOf data field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfMap").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoMapApiResponse"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoMapApiResponse" } as WireType.Object
+        val data = obj.fields.single { it.name == "data" }
+        val map = data.type.shouldBeInstanceOf<WireType.MapOf>()
+        map.value.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+    }
+
+    @Test
+    fun `List of Page of UserDto at use site stays native ListOf with flattened element`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("listOfPage").genericType
+
+        val out = extractor.extract(type)
+        val list = out.shouldBeInstanceOf<WireType.ListOf>()
+        list.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        // The use-site List does NOT emit a UserDtoPageList wrapper.
+        extractor.definitions.map { definitionName(it) } shouldNotContain "UserDtoPageList"
+    }
+
+    @Test
+    fun `same instantiation reached twice produces one definition`() {
+        val freshExtractor = TypeExtractor()
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+
+        freshExtractor.extract(type)
+        freshExtractor.extract(type)
+
+        val count = freshExtractor.definitions.count { (it as? WireType.Object)?.name == "UserDtoPage" }
+        count shouldBe 1
+    }
+
+    @Test
+    fun `extracting a class that extends a raw generic parent fails with a clear error`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.RawSuperPage::class.java)
+        }
+        ex.message!! shouldContainString "RawSuperPage extends generic Page"
+        ex.message!! shouldContainString "Page<UserDto>"
+    }
+
+    @Test
+    fun `extracting a generic with a wildcard argument fails with a clear error`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.BadControllers::class.java
+            .getDeclaredField("wildcardPage").genericType
+
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(type)
+        }
+        ex.message!! shouldContainString "Wildcard type argument"
+        ex.message!! shouldContainString "replace with a concrete type"
+    }
+
+    @Test
+    fun `extracting a raw generic class fails with a clear error`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.Page::class.java)
+        }
+        ex.message!! shouldContainString "Cannot extract raw generic type Page"
+        ex.message!! shouldContainString "provide a concrete type argument"
+    }
+
+    @Test
+    fun `hand-written UserDtoPage and flattened Page of UserDto are disambiguated deterministically`() {
+        val freshExtractor = TypeExtractor()
+
+        // Register the hand-written class first; it claims "UserDtoPage".
+        val handRef = freshExtractor.extract(
+            community.flock.wirespec.spring.extractor.fixtures.generic.UserDtoPage::class.java
+        )
+        handRef.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        // Then extract Page<UserDto>; it gets the numeric suffix.
+        val flatRef = freshExtractor.extract(
+            community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+                .getDeclaredField("userDtoPage").genericType
+        )
+        flatRef.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage2"
+
+        val names = freshExtractor.definitions.map { definitionName(it) }
+        names shouldContainAll listOf("UserDtoPage", "UserDtoPage2")
+    }
+
+    @Test
+    fun `UserPage subclass of Page of UserDto extracts to Ref UserPage with inherited fields substituted`() {
+        val ref = extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.UserPage::class.java)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserPage"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserPage" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+
+        // Inherited fields, parent-first ordering.
+        byName["content"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["totalElements"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_64)
+        byName["number"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+
+        // Own field.
+        byName["pageLabel"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+
+        // Field ordering: parent fields first, then declared.
+        val parentFields = listOf("content", "totalElements", "number")
+        val ownFields = listOf("pageLabel")
+        obj.fields.map { it.name } shouldBe parentFields + ownFields
+    }
+
+    @Test
+    fun `Tree of UserDto flattens to UserDtoTree without infinite recursion`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoTree").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoTree"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoTree" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+
+        // `children: List<Tree<T>>` -> ListOf(Ref("UserDtoTree")) via the cached placeholder.
+        val children = byName["children"]!!.type.shouldBeInstanceOf<WireType.ListOf>()
+        children.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoTree"
+
+        // Exactly one UserDtoTree definition.
+        extractor.definitions.count { (it as? WireType.Object)?.name == "UserDtoTree" } shouldBe 1
+    }
+
+    @Test
+    fun `distinct flattened instantiations are each registered`() {
+        val freshExtractor = TypeExtractor()
+        val userPage = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+        val arOfList = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfList").genericType
+        val arOfMap = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("apiResponseOfMap").genericType
+
+        freshExtractor.extract(userPage)
+        freshExtractor.extract(arOfList)
+        freshExtractor.extract(arOfMap)
+
+        val names = freshExtractor.definitions.map { definitionName(it) }.toSet()
+        names shouldContainAll listOf("UserDtoPage", "UserDtoListApiResponse", "UserDtoMapApiResponse")
     }
 }

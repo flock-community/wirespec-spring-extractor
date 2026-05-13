@@ -23,4 +23,7 @@ class AdminController {
 
     @GetMapping("/by-role")
     fun listByRole(@RequestParam role: Role): List<String> = throw NotImplementedError()
+
+    @GetMapping("/page")
+    fun adminPage(): com.acme.api.dto.Page<com.acme.api.dto.UserDto> = throw NotImplementedError()
 }

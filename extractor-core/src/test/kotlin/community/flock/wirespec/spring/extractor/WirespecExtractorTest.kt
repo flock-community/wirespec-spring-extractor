@@ -91,4 +91,36 @@ class WirespecExtractorTest {
             )
         )
     }
+
+    @Test
+    fun `rawGenericReference factory produces an actionable message`() {
+        val ex = WirespecExtractorException.rawGenericReference(
+            rawClass = "com.example.Page",
+            controllerMethod = "UserController.list",
+        )
+        ex.message!! shouldContain "Cannot extract raw generic type Page"
+        ex.message!! shouldContain "UserController.list"
+        ex.message!! shouldContain "provide a concrete type argument"
+    }
+
+    @Test
+    fun `wildcardArgument factory produces an actionable message`() {
+        val ex = WirespecExtractorException.wildcardArgument(
+            atType = "Page<?>",
+            controllerMethod = "UserController.list",
+        )
+        ex.message!! shouldContain "Wildcard type argument in Page<?>"
+        ex.message!! shouldContain "UserController.list"
+        ex.message!! shouldContain "replace with a concrete type"
+    }
+
+    @Test
+    fun `rawGenericSuperclass factory produces an actionable message`() {
+        val ex = WirespecExtractorException.rawGenericSuperclass(
+            subclassName = "UserPage",
+            rawSuperclassName = "Page",
+        )
+        ex.message!! shouldContain "UserPage extends generic Page"
+        ex.message!! shouldContain "Page<UserDto>"
+    }
 }

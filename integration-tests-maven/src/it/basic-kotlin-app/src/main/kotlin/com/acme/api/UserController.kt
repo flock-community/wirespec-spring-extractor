@@ -28,4 +28,7 @@ class UserController {
 
     @DeleteMapping("/{id}")
     suspend fun deleteUser(@PathVariable id: String) { /* Unit-returning suspend → 204 */ }
+
+    @GetMapping("/page")
+    fun page(): com.acme.api.dto.Page<UserDto> = throw NotImplementedError()
 }

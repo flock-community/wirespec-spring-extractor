@@ -188,42 +188,40 @@ class FixtureBuildTest {
         controller shouldMatch Regex("(?s).*endpoint DeleteUser DELETE /users/\\{id.*")
         controller shouldMatch Regex("(?s).*204 -> Unit.*")
 
-        // UserDto is referenced only by UserController, so its definition lives
-        // inside UserController.ws (NOT types.ws).
-        controller shouldContain "type UserDto"
-
-        // Kotlin nullability path on UserDto fields.
-        controller shouldMatch Regex("(?s).*id\\s*:\\s*String\\b(?!\\?).*")
-        controller shouldMatch Regex("(?s).*nickname\\s*:\\s*String\\?.*")
-
-        // JDK value types filtered to String inside UserDto's fields.
-        controller shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\b(?!\\?).*")
-        controller shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\b(?!\\?).*")
-        controller shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\b(?!\\?).*")
-        controller shouldMatch Regex("(?s).*balance\\s*:\\s*String\\b(?!\\?).*")
-
-        // Underscored / capitalised field names backticked inside UserDto.
-        controller shouldContain "`_internalId`"
-        controller shouldContain "`SystemKey`"
-        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(controller)) {
-            "_internalId appears un-backticked at line start in UserController.ws:\n$controller"
-        }
-
         val admin = File(wsDir, "AdminController.ws").readText()
         admin shouldContain "endpoint ListByRole GET /admins/by-role"
 
-        // types.ws now holds only types referenced by ≥2 controllers. Role
-        // qualifies: AdminController references it directly, UserController
-        // transitively via UserDto.
+        // UserDto and UserDtoPage are shared (Page<UserDto> referenced by both controllers,
+        // and UserDtoPage transitively references UserDto), so both live in types.ws.
         val types = File(wsDir, "types.ws").readText()
         types shouldContain "Role"
-        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(types)) {
-            "UserDto leaked into types.ws despite having a single owner:\n$types"
+        types shouldContain "type UserDto"
+        types shouldContain "type UserDtoPage"
+
+        // Kotlin nullability + JDK-value-to-String + backticked names — all asserted
+        // against the shared UserDto in types.ws now.
+        types shouldMatch Regex("(?s).*id\\s*:\\s*String\\b(?!\\?).*")
+        types shouldMatch Regex("(?s).*nickname\\s*:\\s*String\\?.*")
+        types shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\b(?!\\?).*")
+        types shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\b(?!\\?).*")
+        types shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\b(?!\\?).*")
+        types shouldMatch Regex("(?s).*balance\\s*:\\s*String\\b(?!\\?).*")
+        types shouldContain "`_internalId`"
+        types shouldContain "`SystemKey`"
+        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(types)) {
+            "_internalId appears un-backticked at line start in types.ws:\n$types"
         }
 
-        // Generic-flattening: Page<UserDto> -> type UserDtoPage, lives with UserController.
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(controller)) {
+            "UserDto leaked into UserController.ws despite being shared via UserDtoPage:\n$controller"
+        }
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDtoPage\\b").containsMatchIn(controller)) {
+            "UserDtoPage leaked into UserController.ws despite being shared:\n$controller"
+        }
+
+        // Both controllers expose the Page<UserDto>-flattening endpoint.
         controller shouldContain "endpoint Page GET /users/page"
-        controller shouldContain "type UserDtoPage"
+        admin shouldContain "endpoint AdminPage GET /admins/page"
 
         // JDK class names must not leak as Wirespec definitions in any file.
         val combined = controller + "\n" + types + "\n" + admin
@@ -252,33 +250,37 @@ class FixtureBuildTest {
         val controller = File(wsDir, "UserController.ws").readText()
         controller shouldContain "endpoint GetUser GET /users/{id"
         controller shouldContain "endpoint CreateUser POST"
-        controller shouldContain "type UserDto"
-
-        // JDK value types filtered to String on UserDto fields. Java records are
-        // all-nullable, so accept both `String` and `String?`.
-        controller shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\??.*")
-        controller shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\??.*")
-        controller shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\??.*")
-        controller shouldMatch Regex("(?s).*balance\\s*:\\s*String\\??.*")
-
-        controller shouldContain "`_internalId`"
-        controller shouldContain "`SystemKey`"
-        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(controller)) {
-            "_internalId appears un-backticked at line start in UserController.ws:\n$controller"
-        }
 
         val admin = File(wsDir, "AdminController.ws").readText()
         admin shouldContain "endpoint ListByRole GET /admins/by-role"
 
+        // UserDto and UserDtoPage are shared (Page<UserDto> referenced by both controllers,
+        // and UserDtoPage transitively references UserDto), so both live in types.ws.
         val types = File(wsDir, "types.ws").readText()
         types shouldContain "Role"
-        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(types)) {
-            "UserDto leaked into types.ws despite having a single owner:\n$types"
+        types shouldContain "type UserDto"
+        types shouldContain "type UserDtoPage"
+
+        // Field shapes against the shared UserDto in types.ws.
+        types shouldMatch Regex("(?s).*createdAt\\s*:\\s*String\\??.*")
+        types shouldMatch Regex("(?s).*lastSeen\\s*:\\s*String\\??.*")
+        types shouldMatch Regex("(?s).*timezone\\s*:\\s*String\\??.*")
+        types shouldMatch Regex("(?s).*balance\\s*:\\s*String\\??.*")
+        types shouldContain "`_internalId`"
+        types shouldContain "`SystemKey`"
+        assertTrue(!Regex("(?m)^\\s*_internalId\\s*:").containsMatchIn(types)) {
+            "_internalId appears un-backticked at line start in types.ws:\n$types"
         }
 
-        // Generic-flattening: Page<UserDto> -> type UserDtoPage, lives with UserController.
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDto\\b").containsMatchIn(controller)) {
+            "UserDto leaked into UserController.ws despite being shared via UserDtoPage:\n$controller"
+        }
+        assertTrue(!Regex("(?m)^\\s*type\\s+UserDtoPage\\b").containsMatchIn(controller)) {
+            "UserDtoPage leaked into UserController.ws despite being shared:\n$controller"
+        }
+
         controller shouldContain "endpoint Page GET /users/page"
-        controller shouldContain "type UserDtoPage"
+        admin shouldContain "endpoint AdminPage GET /admins/page"
 
         val combined = controller + "\n" + types + "\n" + admin
         assertTrue(!Regex("(?m)^\\s*type\\s+Page\\b").containsMatchIn(combined)) {

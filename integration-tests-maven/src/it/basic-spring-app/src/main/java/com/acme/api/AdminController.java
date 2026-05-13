@@ -24,4 +24,9 @@ public class AdminController {
     public List<String> listByRole(@RequestParam Role role) {
         return Collections.emptyList();
     }
+
+    @GetMapping("/page")
+    public com.acme.api.dto.Page<com.acme.api.dto.UserDto> adminPage() {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -361,6 +361,27 @@ class TypeExtractorTest {
     }
 
     @Test
+    fun `hand-written UserDtoPage and flattened Page of UserDto are disambiguated deterministically`() {
+        val freshExtractor = TypeExtractor()
+
+        // Register the hand-written class first; it claims "UserDtoPage".
+        val handRef = freshExtractor.extract(
+            community.flock.wirespec.spring.extractor.fixtures.generic.UserDtoPage::class.java
+        )
+        handRef.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        // Then extract Page<UserDto>; it gets the numeric suffix.
+        val flatRef = freshExtractor.extract(
+            community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+                .getDeclaredField("userDtoPage").genericType
+        )
+        flatRef.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage2"
+
+        val names = freshExtractor.definitions.map { definitionName(it) }
+        names shouldContainAll listOf("UserDtoPage", "UserDtoPage2")
+    }
+
+    @Test
     fun `UserPage subclass of Page of UserDto extracts to Ref UserPage with inherited fields substituted`() {
         val ref = extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.UserPage::class.java)
         ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserPage"

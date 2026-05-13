@@ -36,6 +36,165 @@ class TypeOwnershipTest {
         result.perController["UserController"] shouldBe listOf(ep, userDto)
         result.shared shouldBe emptyList()
     }
+
+    @Test
+    fun `two controllers sharing a type — type goes to shared`() {
+        val epA = endpoint("GetUserA", Reference.Custom("UserDto", false))
+        val epB = endpoint("GetUserB", Reference.Custom("UserDto", false))
+        val userDto = typeDef("UserDto")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(epA), "B" to listOf(epB)),
+            allTypes = listOf(userDto),
+        )
+
+        result.perController["A"] shouldBe listOf(epA)
+        result.perController["B"] shouldBe listOf(epB)
+        result.shared shouldBe listOf(userDto)
+    }
+
+    @Test
+    fun `two controllers with disjoint types — each keeps its own`() {
+        val epA = endpoint("GetFoo", Reference.Custom("Foo", false))
+        val epB = endpoint("GetBar", Reference.Custom("Bar", false))
+        val foo = typeDef("Foo")
+        val bar = typeDef("Bar")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(epA), "B" to listOf(epB)),
+            allTypes = listOf(foo, bar),
+        )
+
+        result.perController["A"] shouldBe listOf(epA, foo)
+        result.perController["B"] shouldBe listOf(epB, bar)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `transitive ownership — nested type follows its parent into the controller`() {
+        val ep = endpoint("GetUser", Reference.Custom("UserDto", false))
+        val userDto = typeDef("UserDto", "address" to "Address")
+        // "Address.street" → Custom("String") here exercises the unresolved-name leaf.
+        val address = typeDef("Address", "street" to "String")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("UserController" to listOf(ep)),
+            allTypes = listOf(userDto, address),
+        )
+
+        result.perController["UserController"] shouldBe listOf(ep, userDto, address)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `transitive promotion — nested type referenced directly by another controller moves to shared`() {
+        val epA = endpoint("GetUser", Reference.Custom("UserDto", false))
+        val epB = endpoint("GetAddress", Reference.Custom("Address", false))
+        val userDto = typeDef("UserDto", "address" to "Address")
+        val address = typeDef("Address")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(epA), "B" to listOf(epB)),
+            allTypes = listOf(userDto, address),
+        )
+
+        result.perController["A"] shouldBe listOf(epA, userDto)
+        result.perController["B"] shouldBe listOf(epB)
+        result.shared shouldBe listOf(address)
+    }
+
+    @Test
+    fun `enum shared across controllers goes to shared`() {
+        val epA = endpoint("GetA", Reference.Custom("Status", false))
+        val epB = endpoint("GetB", Reference.Custom("Status", false))
+        val status = enumDef("Status")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(epA), "B" to listOf(epB)),
+            allTypes = listOf(status),
+        )
+
+        result.shared shouldBe listOf(status)
+        result.perController["A"] shouldBe listOf(epA)
+        result.perController["B"] shouldBe listOf(epB)
+    }
+
+    @Test
+    fun `refined type with single owner is placed in that controller`() {
+        val ep = endpoint("GetUser", Reference.Custom("UserDto", false))
+        val userDto = typeDef("UserDto", "email" to "EmailString")
+        val emailString = refinedDef("EmailString")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("UserController" to listOf(ep)),
+            allTypes = listOf(userDto, emailString),
+        )
+
+        result.perController["UserController"] shouldBe listOf(ep, userDto, emailString)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `cyclic references do not loop and ownership is single-controller`() {
+        val ep = endpoint("GetNode", Reference.Custom("Node", false))
+        val node = typeDef("Node", "next" to "Node")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("Tree" to listOf(ep)),
+            allTypes = listOf(node),
+        )
+
+        result.perController["Tree"] shouldBe listOf(ep, node)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `orphan type with no controller reference goes to shared and warns`() {
+        val ep = endpoint("Get", Reference.Custom("UserDto", false))
+        val userDto = typeDef("UserDto")
+        val orphan = typeDef("Orphan")
+        val warnings = mutableListOf<String>()
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(ep)),
+            allTypes = listOf(userDto, orphan),
+            onWarn = { warnings += it },
+        )
+
+        result.perController["A"] shouldBe listOf(ep, userDto)
+        result.shared shouldBe listOf(orphan)
+        warnings.any { it.contains("Orphan") } shouldBe true
+    }
+
+    @Test
+    fun `controller with no endpoints contributes nothing and owns nothing`() {
+        val ep = endpoint("Get", Reference.Custom("UserDto", false))
+        val userDto = typeDef("UserDto")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("Empty" to emptyList(), "A" to listOf(ep)),
+            allTypes = listOf(userDto),
+        )
+
+        result.perController["Empty"] shouldBe emptyList()
+        result.perController["A"] shouldBe listOf(ep, userDto)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `owned types are appended in registration order, not in reference order`() {
+        val ep = endpoint("Get", Reference.Custom("B", false))  // direct ref to B first
+        val a = typeDef("A")
+        val b = typeDef("B", "a" to "A")  // B references A (so A is discovered after B)
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf("A" to listOf(ep)),
+            allTypes = listOf(a, b),  // registration order: A then B
+        )
+
+        // The output preserves allTypes order: A before B.
+        result.perController["A"] shouldBe listOf(ep, a, b)
+    }
 }
 
 private fun endpoint(name: String, responseRef: Reference?): WsEndpoint = WsEndpoint(

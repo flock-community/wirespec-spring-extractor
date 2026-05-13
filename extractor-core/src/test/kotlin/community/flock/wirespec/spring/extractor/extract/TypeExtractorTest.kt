@@ -221,4 +221,24 @@ class TypeExtractorTest {
         byName["nullable"]!!.type.nullable shouldBe true
         byName["notNullablePrimitive"]!!.type.nullable shouldBe false
     }
+
+    @Test
+    fun `Page of UserDto flattens to UserDtoPage with substituted fields`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoPage").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoPage"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoPage" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+
+        byName["content"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["totalElements"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_64)
+        byName["number"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+
+        // The raw generic class is NOT registered.
+        val defNames = extractor.definitions.map { definitionName(it) }.toSet()
+        defNames shouldNotContain "Page"
+    }
 }

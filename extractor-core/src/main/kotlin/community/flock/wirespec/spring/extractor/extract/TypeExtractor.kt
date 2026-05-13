@@ -1,5 +1,6 @@
 package community.flock.wirespec.spring.extractor.extract
 
+import community.flock.wirespec.spring.extractor.WirespecExtractorException
 import community.flock.wirespec.spring.extractor.model.WireType
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
@@ -19,7 +20,10 @@ open class TypeExtractor {
     private val cache = mutableMapOf<String, WireType>()
     protected val _definitions = linkedSetOf<WireType>()
     /** Tracks which simple name has been claimed by which FQN to detect cross-package collisions. */
-    private val usedNames = mutableMapOf<String, String>()  // simpleName -> fqn that claimed it
+    private val usedNames = mutableMapOf<String, String>()  // simpleName -> identity that claimed it
+
+    /** Stack of TypeVariable -> Type bindings, pushed when entering a parameterized type's body. */
+    private val bindings = ArrayDeque<Map<TypeVariable<*>, Type>>()
 
     val definitions: Set<WireType> get() = _definitions
 
@@ -30,7 +34,9 @@ open class TypeExtractor {
         is Class<*>          -> fromClass(type, nullable)
         is ParameterizedType -> fromParameterized(type, nullable)
         is WildcardType      -> extractInner(type.upperBounds.firstOrNull() ?: Any::class.java, nullable)
-        is TypeVariable<*>   -> WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
+        is TypeVariable<*>   -> resolveBinding(type)
+            ?.let { extractInner(it, nullable) }
+            ?: WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         else                 -> WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
     }
 
@@ -55,16 +61,39 @@ open class TypeExtractor {
         }
     }
 
+    /**
+     * Like [nameFor] but for a composed flat name (e.g., "UserDtoPage" from Page<UserDto>).
+     * The collision key is `${rawClass.name}#$composed` so a hand-written class registered
+     * under the plain FQN cannot match a flattened-generic identity, and the flattened
+     * generic gets a numeric suffix.
+     */
+    private fun nameFor(composed: String, rawClass: Class<*>): String {
+        val identity = "${rawClass.name}#$composed"
+        val existing = usedNames[composed]
+        return when {
+            existing == null -> { usedNames[composed] = identity; composed }
+            existing == identity -> composed
+            else -> {
+                var i = 2
+                while (usedNames["$composed$i"] != null && usedNames["$composed$i"] != identity) i++
+                val newName = "$composed$i"
+                if (usedNames[newName] == null) usedNames[newName] = identity
+                newName
+            }
+        }
+    }
+
     private fun fromClass(cls: Class<*>, nullable: Boolean): WireType {
         primitiveOf(cls)?.let { return it.copy(nullable = nullable) }
         if (cls == String::class.java) return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         if (cls == ByteArray::class.java) return WireType.Primitive(WireType.Primitive.Kind.BYTES, nullable)
         if (cls == UUID::class.java) return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         if (Enum::class.java.isAssignableFrom(cls)) {
-            cache[cls.name]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
+            val fp = cls.name
+            cache[fp]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
             val name = nameFor(cls)
             val ref = WireType.Ref(name, nullable)
-            cache[cls.name] = ref.copy(nullable = false)
+            cache[fp] = ref.copy(nullable = false)
             @Suppress("UNCHECKED_CAST")
             val values = (cls.enumConstants as Array<Enum<*>>).map { it.name }
             _definitions += WireType.EnumDef(name, values)
@@ -81,10 +110,11 @@ open class TypeExtractor {
             return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         }
         // Object class — register and recurse into its fields.
-        cache[cls.name]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
+        val fp = cls.name
+        cache[fp]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
         val name = nameFor(cls)
         val ref = WireType.Ref(name, nullable)
-        cache[cls.name] = ref.copy(nullable = false)
+        cache[fp] = ref.copy(nullable = false)
         val fields = walkFields(cls)
         _definitions += WireType.Object(name, fields)
         return ref
@@ -105,9 +135,110 @@ open class TypeExtractor {
             val v = extractInner(valueArg, nullable = false)
             return WireType.MapOf(v, nullable)
         }
-        // Generic value class — fall back to its raw type for now.
-        return fromClass(raw, nullable)
+        // User-level generic — flatten.
+        return flattenGeneric(pt, nullable)
     }
+
+    /**
+     * Flatten a `Page<UserDto>`-style parameterized type into a uniquely-named
+     * Object definition with type-substituted fields.
+     */
+    private fun flattenGeneric(pt: ParameterizedType, nullable: Boolean): WireType {
+        val raw = pt.rawType as Class<*>
+        val fp = fingerprint(pt)
+
+        // Same instantiation reached twice -> same ref.
+        cache[fp]?.let { return (it as WireType.Ref).copy(nullable = nullable) }
+
+        // Compose the display name from resolved args, then disambiguate.
+        val composedName = flatName(pt)
+        val name = nameFor(composedName, raw)
+
+        // Insert placeholder ref BEFORE walking fields so self-referential
+        // generics terminate (Tree<UserDto> -> children: List<Tree<UserDto>>).
+        val ref = WireType.Ref(name, nullable)
+        cache[fp] = ref.copy(nullable = false)
+
+        // Build binding frame: typeParameter -> actualTypeArgument.
+        @Suppress("UNCHECKED_CAST")
+        val frame = raw.typeParameters
+            .zip(pt.actualTypeArguments)
+            .toMap() as Map<TypeVariable<*>, Type>
+        bindings.addFirst(frame)
+        try {
+            val fields = walkFields(raw)
+            _definitions += WireType.Object(name, fields)
+        } finally {
+            bindings.removeFirst()
+        }
+        return ref
+    }
+
+    /**
+     * Stable fingerprint for cache lookup. Uses FQNs so that display-name
+     * disambiguation (`UserDtoPage` vs `UserDtoPage2`) cannot confuse the cache.
+     */
+    private fun fingerprint(type: Type): String = when (type) {
+        is Class<*> -> type.name
+        is ParameterizedType -> {
+            val raw = (type.rawType as Class<*>).name
+            val args = type.actualTypeArguments.joinToString(",") { fingerprint(it) }
+            "$raw($args)"
+        }
+        is WildcardType -> "?"
+        is TypeVariable<*> -> resolveBinding(type)?.let { fingerprint(it) } ?: "T:${type.name}"
+        else -> type.typeName
+    }
+
+    /** Walk the bindings stack outside-in to resolve [variable]. */
+    private fun resolveBinding(variable: TypeVariable<*>): Type? {
+        for (frame in bindings) {
+            frame[variable]?.let { return it }
+        }
+        return null
+    }
+
+    /**
+     * Display name for a type as it appears inside a flattened wrapper name.
+     * Composed names get funneled through [nameFor] for collision handling.
+     */
+    private fun flatName(type: Type): String = when (type) {
+        is Class<*> -> when {
+            primitiveOf(type) != null -> type.simpleName
+            type == String::class.java -> "String"
+            type == ByteArray::class.java -> "ByteArray"
+            type == java.util.UUID::class.java -> "UUID"
+            else -> type.simpleName
+        }
+        is ParameterizedType -> {
+            val raw = type.rawType as Class<*>
+            val args = type.actualTypeArguments
+            when {
+                Collection::class.java.isAssignableFrom(raw) -> flatName(args[0]) + "List"
+                Map::class.java.isAssignableFrom(raw)        -> flatName(args[1]) + "Map"
+                else -> args.joinToString("") { flatName(it) } + raw.simpleName
+            }
+        }
+        is TypeVariable<*> -> resolveBinding(type)
+            ?.let { flatName(it) }
+            ?: throw WirespecExtractorException.unboundTypeVariable(
+                variable = type.name,
+                inClassField = "<flatName>",
+                controllerMethod = currentContext(),
+            )
+        is WildcardType -> throw WirespecExtractorException.wildcardArgument(
+            atType = type.typeName,
+            controllerMethod = currentContext(),
+        )
+        else -> type.typeName
+    }
+
+    /**
+     * Best-effort description of the originating controller method for error
+     * messages. Until controller context is threaded through this returns
+     * a sentinel; the static parts of error messages still hold.
+     */
+    private fun currentContext(): String = "<unknown>"
 
     /** Override-able by subclasses (Tasks 9-12) to inject Jackson/Validation/Schema processing. */
     protected open fun walkFields(cls: Class<*>): List<WireType.Field> {

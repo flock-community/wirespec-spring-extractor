@@ -6,6 +6,7 @@ import community.flock.wirespec.spring.extractor.classpath.ClasspathBuilder
 import community.flock.wirespec.spring.extractor.emit.Emitter
 import community.flock.wirespec.spring.extractor.extract.EndpointExtractor
 import community.flock.wirespec.spring.extractor.extract.TypeExtractor
+import community.flock.wirespec.spring.extractor.ownership.TypeOwnership
 import community.flock.wirespec.spring.extractor.scan.ControllerScanner
 import java.io.File
 
@@ -71,7 +72,7 @@ object WirespecExtractor {
                 c.simpleName to eps.map { it as Definition }
             }.filterValues { it.isNotEmpty() }
 
-            val sharedTypes = types.definitions.mapNotNull { def ->
+            val allTypes = types.definitions.mapNotNull { def ->
                 try {
                     builder.toDefinition(def)
                 } catch (t: Throwable) {
@@ -80,18 +81,24 @@ object WirespecExtractor {
                 }
             }
 
+            val partition = TypeOwnership.partition(
+                endpointsByController = byController,
+                allTypes = allTypes,
+                onWarn = { msg -> config.log.warn(msg) },
+            )
+
             val filesWritten = Emitter().write(
                 outputDir = config.outputDirectory,
-                controllerDefinitions = byController,
-                sharedTypes = sharedTypes,
+                controllerDefinitions = partition.perController,
+                sharedTypes = partition.shared,
             )
             config.log.info(
-                "Wrote ${byController.size + (if (sharedTypes.isEmpty()) 0 else 1)} .ws file(s) to ${config.outputDirectory.absolutePath}"
+                "Wrote ${partition.perController.size + (if (partition.shared.isEmpty()) 0 else 1)} .ws file(s) to ${config.outputDirectory.absolutePath}"
             )
 
             ExtractResult(
-                controllerCount = byController.size,
-                sharedTypeCount = sharedTypes.size,
+                controllerCount = partition.perController.size,
+                sharedTypeCount = partition.shared.size,
                 filesWritten = filesWritten,
             )
         }

@@ -135,7 +135,16 @@ class GradleFixtureBuildTest {
             "UserDto leaked into types.ws despite having a single owner:\n$types"
         }
 
+        // Generic-flattening: Page<UserDto> -> type UserDtoPage, lives with UserController.
+        controller shouldContain "endpoint Page GET /users/page"
+        controller shouldContain "type UserDtoPage"
+
+        // The raw `Page` type never appears anywhere.
         val combined = controller + "\n" + types + "\n" + admin
+        assertTrue(!Regex("(?m)^\\s*type\\s+Page\\b").containsMatchIn(combined)) {
+            "Raw Page type leaked into a .ws file:\n$combined"
+        }
+
         listOf("LocalDateTime", "Instant", "ZoneOffset", "BigDecimal", "LocalDate", "ZonedDateTime").forEach { jdk ->
             assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(combined)) {
                 "JDK type $jdk leaked into a .ws file:\n$combined"
@@ -178,7 +187,15 @@ class GradleFixtureBuildTest {
             "UserDto leaked into types.ws despite having a single owner:\n$types"
         }
 
+        // Generic-flattening: Page<UserDto> -> type UserDtoPage, lives with UserController.
+        controller shouldContain "endpoint Page GET /users/page"
+        controller shouldContain "type UserDtoPage"
+
         val combined = controller + "\n" + types + "\n" + admin
+        assertTrue(!Regex("(?m)^\\s*type\\s+Page\\b").containsMatchIn(combined)) {
+            "Raw Page type leaked into a .ws file:\n$combined"
+        }
+
         listOf("LocalDateTime", "Instant", "ZoneOffset", "BigDecimal", "LocalDate", "ZonedDateTime").forEach { jdk ->
             assertTrue(!Regex("(?m)^\\s*(type|enum|refined)\\s+$jdk\\b").containsMatchIn(combined)) {
                 "JDK type $jdk leaked into a .ws file:\n$combined"

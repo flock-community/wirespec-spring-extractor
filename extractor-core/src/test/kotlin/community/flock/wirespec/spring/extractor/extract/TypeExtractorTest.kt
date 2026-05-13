@@ -364,6 +364,18 @@ class TypeExtractorTest {
     }
 
     @Test
+    fun `extracting a generic with a wildcard argument fails with a clear error`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.BadControllers::class.java
+            .getDeclaredField("wildcardPage").genericType
+
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(type)
+        }
+        ex.message!! shouldContainString "Wildcard type argument"
+        ex.message!! shouldContainString "replace with a concrete type"
+    }
+
+    @Test
     fun `extracting a raw generic class fails with a clear error`() {
         val ex = assertThrows<WirespecExtractorException> {
             extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.Page::class.java)

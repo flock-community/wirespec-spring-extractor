@@ -153,6 +153,19 @@ open class TypeExtractor {
      */
     private fun flattenGeneric(pt: ParameterizedType, nullable: Boolean): WireType {
         val raw = pt.rawType as Class<*>
+
+        // Reject wildcards in args (Page<?>, Page<? extends X>) — they have no single concrete binding.
+        // Doing this up-front gives a clearer error message (mentions the full parameterized type)
+        // than letting it surface inside flatName().
+        for (arg in pt.actualTypeArguments) {
+            if (arg is WildcardType) {
+                throw WirespecExtractorException.wildcardArgument(
+                    atType = pt.typeName,
+                    controllerMethod = currentContext(),
+                )
+            }
+        }
+
         val fp = fingerprint(pt)
 
         // Same instantiation reached twice -> same ref.

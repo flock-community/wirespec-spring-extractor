@@ -11,4 +11,7 @@ public class UserController {
 
     @PostMapping
     public UserDto createUser(@RequestBody UserDto body) { return body; }
+
+    @GetMapping("/page")
+    public com.acme.api.dto.Page<UserDto> page() { throw new UnsupportedOperationException(); }
 }

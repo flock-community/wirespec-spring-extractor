@@ -65,6 +65,8 @@ object WirespecExtractor {
             val byController = controllers.associate { c ->
                 val eps = try {
                     endpoints.extract(c).map(builder::toEndpoint)
+                } catch (e: WirespecExtractorException) {
+                    throw e  // user-facing errors (e.g., generic-flattening) must fail the build
                 } catch (t: Throwable) {
                     config.log.warn("Skipping ${c.name}: ${t.message}")
                     emptyList()
@@ -75,6 +77,8 @@ object WirespecExtractor {
             val allTypes = types.definitions.mapNotNull { def ->
                 try {
                     builder.toDefinition(def)
+                } catch (e: WirespecExtractorException) {
+                    throw e
                 } catch (t: Throwable) {
                     config.log.warn("Skipping type ${def}: ${t.message}")
                     null

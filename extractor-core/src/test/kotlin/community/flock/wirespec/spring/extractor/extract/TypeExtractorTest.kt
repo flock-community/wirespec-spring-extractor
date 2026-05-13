@@ -5,6 +5,7 @@ import community.flock.wirespec.spring.extractor.fixtures.dto.Role
 import community.flock.wirespec.spring.extractor.fixtures.dto.TemporalDto
 import community.flock.wirespec.spring.extractor.fixtures.dto.UserDto
 import community.flock.wirespec.spring.extractor.model.WireType
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -240,5 +241,64 @@ class TypeExtractorTest {
         // The raw generic class is NOT registered.
         val defNames = extractor.definitions.map { definitionName(it) }.toSet()
         defNames shouldNotContain "Page"
+    }
+
+    @Test
+    fun `Wrapper of Int flattens to IntegerWrapper with INTEGER_32 value field`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("intWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "IntegerWrapper"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "IntegerWrapper" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.INTEGER_32)
+    }
+
+    @Test
+    fun `Wrapper of String flattens to StringWrapper`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("stringWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "StringWrapper"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "StringWrapper" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    }
+
+    @Test
+    fun `Pair2 of UserDto and Role flattens to UserDtoRolePair2 with both fields substituted`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("pairUserOrder").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoRolePair2"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoRolePair2" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["first"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["second"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "Role"
+    }
+
+    @Test
+    fun `Page of Wrapper of UserDto flattens innermost first to UserDtoWrapperPage`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("nestedPageOfWrapper").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoWrapperPage"
+
+        val names = extractor.definitions.map { definitionName(it) }.toSet()
+        names shouldContain "UserDtoWrapper"
+        names shouldContain "UserDtoWrapperPage"
+
+        val outer = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoWrapperPage" } as WireType.Object
+        outer.fields.single { it.name == "content" }.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoWrapper"
+
+        val inner = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoWrapper" } as WireType.Object
+        inner.fields.single { it.name == "value" }.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
     }
 }

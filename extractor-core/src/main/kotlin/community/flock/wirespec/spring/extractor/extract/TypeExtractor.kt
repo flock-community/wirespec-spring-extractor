@@ -131,16 +131,14 @@ open class TypeExtractor {
     private fun fromParameterized(pt: ParameterizedType, nullable: Boolean): WireType {
         val raw = pt.rawType as Class<*>
         if (Collection::class.java.isAssignableFrom(raw)) {
-            val arg = pt.actualTypeArguments[0]
-            val element = if (arg is WildcardType || arg is TypeVariable<*>)
-                WireType.Primitive(WireType.Primitive.Kind.STRING)
-            else
-                extractInner(arg, nullable = false)
+            // Let extractInner handle the element type, including TypeVariable resolution
+            // via the bindings stack. The previous TypeVariable -> STRING short-circuit
+            // bypassed bindings and broke generic flattening's inherited-field case.
+            val element = extractInner(pt.actualTypeArguments[0], nullable = false)
             return WireType.ListOf(element, nullable)
         }
         if (Map::class.java.isAssignableFrom(raw)) {
-            val valueArg = pt.actualTypeArguments[1]
-            val v = extractInner(valueArg, nullable = false)
+            val v = extractInner(pt.actualTypeArguments[1], nullable = false)
             return WireType.MapOf(v, nullable)
         }
         // User-level generic — flatten.

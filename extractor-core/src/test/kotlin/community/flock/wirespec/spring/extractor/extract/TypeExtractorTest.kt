@@ -80,10 +80,26 @@ class TypeExtractorTest {
     }
 
     @Test
-    fun `unbound generic ParameterizedType resolves to ListOf STRING with warning`() {
-        val type = Container::class.java.getDeclaredField("items").genericType
-        val out = extractor.extract(type)
-        out.shouldBeInstanceOf<WireType.ListOf>().element shouldBe WireType.Primitive(WireType.Primitive.Kind.STRING)
+    fun `extracting raw Container fails because it declares type parameters`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(Container::class.java)
+        }
+        ex.message!! shouldContainString "Cannot extract raw generic type Container"
+    }
+
+    @Test
+    fun `Container of UserDto flattens to UserDtoContainer with substituted fields`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoContainer").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoContainer"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoContainer" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        val items = byName["items"]!!.type.shouldBeInstanceOf<WireType.ListOf>()
+        items.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+        byName["first"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
     }
 
     @Test

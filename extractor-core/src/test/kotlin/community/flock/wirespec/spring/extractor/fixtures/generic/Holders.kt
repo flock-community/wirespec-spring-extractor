@@ -19,6 +19,8 @@ class Holders {
     val apiResponseOfMap: ApiResponse<Map<String, UserDto>> = ApiResponse(data = emptyMap(), status = 200)
     val listOfPage: List<Page<UserDto>> = emptyList()
     val userDtoTree: Tree<UserDto> = Tree(value = stubUser(), children = emptyList())
+    val userDtoContainer: community.flock.wirespec.spring.extractor.fixtures.dto.Container<UserDto> =
+        community.flock.wirespec.spring.extractor.fixtures.dto.Container(items = emptyList(), first = stubUser())
 
     private fun stubUser(): UserDto = UserDto(
         id = "x", age = 0, active = true, role = Role.MEMBER, tags = emptyList(),

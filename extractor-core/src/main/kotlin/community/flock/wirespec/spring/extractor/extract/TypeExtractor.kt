@@ -109,6 +109,14 @@ open class TypeExtractor {
         if (isJdkOpaqueType(cls)) {
             return WireType.Primitive(WireType.Primitive.Kind.STRING, nullable)
         }
+        // A raw generic class reached as a reference cannot be flattened because there are
+        // no type arguments to bind. This is a user-fixable error in the controller signature.
+        if (cls.typeParameters.isNotEmpty()) {
+            throw WirespecExtractorException.rawGenericReference(
+                rawClass = cls.name,
+                controllerMethod = currentContext(),
+            )
+        }
         // Object class — register and recurse into its fields.
         val fp = cls.name
         cache[fp]?.let { return (it as WireType.Ref).copy(nullable = nullable) }

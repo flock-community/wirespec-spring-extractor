@@ -1,5 +1,6 @@
 package community.flock.wirespec.spring.extractor.extract
 
+import community.flock.wirespec.spring.extractor.WirespecExtractorException
 import community.flock.wirespec.spring.extractor.fixtures.dto.Container
 import community.flock.wirespec.spring.extractor.fixtures.dto.Role
 import community.flock.wirespec.spring.extractor.fixtures.dto.TemporalDto
@@ -9,8 +10,10 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain as shouldContainString
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.net.URI
@@ -358,6 +361,15 @@ class TypeExtractorTest {
 
         val count = freshExtractor.definitions.count { (it as? WireType.Object)?.name == "UserDtoPage" }
         count shouldBe 1
+    }
+
+    @Test
+    fun `extracting a raw generic class fails with a clear error`() {
+        val ex = assertThrows<WirespecExtractorException> {
+            extractor.extract(community.flock.wirespec.spring.extractor.fixtures.generic.Page::class.java)
+        }
+        ex.message!! shouldContainString "Cannot extract raw generic type Page"
+        ex.message!! shouldContainString "provide a concrete type argument"
     }
 
     @Test

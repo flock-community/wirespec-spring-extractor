@@ -361,6 +361,26 @@ class TypeExtractorTest {
     }
 
     @Test
+    fun `Tree of UserDto flattens to UserDtoTree without infinite recursion`() {
+        val type = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java
+            .getDeclaredField("userDtoTree").genericType
+
+        val ref = extractor.extract(type)
+        ref.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoTree"
+
+        val obj = extractor.definitions.single { (it as? WireType.Object)?.name == "UserDtoTree" } as WireType.Object
+        val byName = obj.fields.associateBy { it.name }
+        byName["value"]!!.type.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDto"
+
+        // `children: List<Tree<T>>` -> ListOf(Ref("UserDtoTree")) via the cached placeholder.
+        val children = byName["children"]!!.type.shouldBeInstanceOf<WireType.ListOf>()
+        children.element.shouldBeInstanceOf<WireType.Ref>().name shouldBe "UserDtoTree"
+
+        // Exactly one UserDtoTree definition.
+        extractor.definitions.count { (it as? WireType.Object)?.name == "UserDtoTree" } shouldBe 1
+    }
+
+    @Test
     fun `distinct flattened instantiations are each registered`() {
         val freshExtractor = TypeExtractor()
         val userPage = community.flock.wirespec.spring.extractor.fixtures.generic.Holders::class.java

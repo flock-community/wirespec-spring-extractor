@@ -18,6 +18,7 @@ class Holders {
     val apiResponseOfList: ApiResponse<List<UserDto>> = ApiResponse(data = emptyList(), status = 200)
     val apiResponseOfMap: ApiResponse<Map<String, UserDto>> = ApiResponse(data = emptyMap(), status = 200)
     val listOfPage: List<Page<UserDto>> = emptyList()
+    val userDtoTree: Tree<UserDto> = Tree(value = stubUser(), children = emptyList())
 
     private fun stubUser(): UserDto = UserDto(
         id = "x", age = 0, active = true, role = Role.MEMBER, tags = emptyList(),

@@ -41,7 +41,7 @@ class EmitterTest {
 
         emitter.write(
             outputDir = dir.toFile(),
-            controllerEndpoints = mapOf("HelloController" to listOf(ep)),
+            controllerDefinitions = mapOf("HelloController" to listOf(ep)),
             sharedTypes = listOf(typeDef),
         )
 
@@ -104,7 +104,11 @@ class EmitterTest {
             responseBody = null,
             statusCode = 204,
         ))
-        emitter.write(dir.toFile(), mapOf("ParamCtl" to listOf(ep)), emptyList())
+        emitter.write(
+            outputDir = dir.toFile(),
+            controllerDefinitions = mapOf("ParamCtl" to listOf(ep)),
+            sharedTypes = emptyList(),
+        )
         val out = File(dir.toFile(), "ParamCtl.ws").readText()
 
         out shouldContain "`_filter`"
@@ -116,7 +120,7 @@ class EmitterTest {
         File(dir.toFile(), "stale.ws").writeText("// stale")
         val keepMe = File(dir.toFile(), "README.md").apply { writeText("keep") }
 
-        emitter.write(outputDir = dir.toFile(), controllerEndpoints = emptyMap(), sharedTypes = emptyList())
+        emitter.write(outputDir = dir.toFile(), controllerDefinitions = emptyMap(), sharedTypes = emptyList())
 
         File(dir.toFile(), "stale.ws").exists() shouldBe false
         keepMe.exists() shouldBe true
@@ -141,7 +145,7 @@ class EmitterTest {
 
         val written: List<File> = emitter.write(
             outputDir = dir.toFile(),
-            controllerEndpoints = mapOf("HelloController" to listOf(ep)),
+            controllerDefinitions = mapOf("HelloController" to listOf(ep)),
             sharedTypes = listOf(typeDef),
         )
 
@@ -153,7 +157,7 @@ class EmitterTest {
     fun `write returns empty list when nothing to emit`(@TempDir dir: Path) {
         val written: List<File> = emitter.write(
             outputDir = dir.toFile(),
-            controllerEndpoints = emptyMap(),
+            controllerDefinitions = emptyMap(),
             sharedTypes = emptyList(),
         )
         written shouldBe emptyList()

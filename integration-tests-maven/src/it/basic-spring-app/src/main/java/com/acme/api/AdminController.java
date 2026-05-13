@@ -1,0 +1,27 @@
+package com.acme.api;
+
+import com.acme.api.dto.Role;
+import java.util.Collections;
+import java.util.List;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Second controller in the fixture so the integration test verifies that
+ * `Role` (referenced by both AdminController via @RequestParam and —
+ * transitively via UserDto — UserController) lands in `types.ws`, while
+ * `UserDto` (referenced only by UserController) moves into
+ * `UserController.ws`.
+ *
+ * Note: @RequestParam (not @PathVariable) is used because path segments are
+ * currently always emitted as String in the Wirespec AST; query parameters
+ * preserve the real binding type.
+ */
+@RestController
+@RequestMapping("/admins")
+public class AdminController {
+
+    @GetMapping("/by-role")
+    public List<String> listByRole(@RequestParam Role role) {
+        return Collections.emptyList();
+    }
+}

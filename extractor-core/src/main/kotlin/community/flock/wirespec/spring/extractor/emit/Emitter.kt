@@ -36,13 +36,14 @@ class Emitter {
      * Render and write all `.ws` files into [outputDir].
      *
      * - Deletes existing `*.ws` files in [outputDir] recursively.
-     * - Writes one `<ControllerName>.ws` per entry of [controllerEndpoints].
+     * - Writes one `<ControllerName>.ws` per entry of [controllerDefinitions]
+     *   (each entry's `List<Definition>` may contain endpoints **and** owned types).
      * - Writes one `types.ws` containing every definition in [sharedTypes].
      * - Never touches non-`.ws` files; never writes outside [outputDir].
      */
     fun write(
         outputDir: File,
-        controllerEndpoints: Map<String, List<Definition>>,
+        controllerDefinitions: Map<String, List<Definition>>,
         sharedTypes: List<Definition>,
     ): List<File> {
         outputDir.mkdirs()
@@ -50,7 +51,7 @@ class Emitter {
 
         val written = mutableListOf<File>()
 
-        controllerEndpoints.forEach { (controller, defs) ->
+        controllerDefinitions.forEach { (controller, defs) ->
             defs.toNonEmptyListOrNull()?.let { nel ->
                 val path = File(outputDir, "$controller.ws")
                 path.writeText(render(nel, "$controller.ws"))

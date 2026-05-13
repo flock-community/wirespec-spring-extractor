@@ -82,7 +82,7 @@ object WirespecExtractor {
 
             val filesWritten = Emitter().write(
                 outputDir = config.outputDirectory,
-                controllerEndpoints = byController,
+                controllerDefinitions = byController,
                 sharedTypes = sharedTypes,
             )
             config.log.info(

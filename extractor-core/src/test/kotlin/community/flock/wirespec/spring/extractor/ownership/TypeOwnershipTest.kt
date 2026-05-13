@@ -195,6 +195,81 @@ class TypeOwnershipTest {
         // The output preserves allTypes order: A before B.
         result.perController["A"] shouldBe listOf(ep, a, b)
     }
+
+    // ---- Flattened-generic scenarios. From ownership's perspective a
+    // ---- "flattened generic" (e.g., UserDtoPage from Page<UserDto>) is just
+    // ---- a regular WireType.Object with a name and a field that references
+    // ---- its concrete type-arg. These tests assert that the partition rules
+    // ---- behave identically for hand-written and flattened types.
+
+    @Test
+    fun `flattened generic referenced by one controller is owned by that controller`() {
+        // UserController returns UserDtoPage which references UserDto.
+        val ep = endpoint("ListUsers", Reference.Custom("UserDtoPage", false))
+        val userDtoPage = typeDef("UserDtoPage", "content" to "UserDto")
+        val userDto = typeDef("UserDto")
+        // AdminController does NOT reference UserDtoPage.
+        val adminEp = endpoint("ListByRole", Reference.Custom("Role", false))
+        val role = enumDef("Role")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf(
+                "UserController" to listOf(ep),
+                "AdminController" to listOf(adminEp),
+            ),
+            allTypes = listOf(userDtoPage, userDto, role),
+        )
+
+        // UserDtoPage and UserDto both flow into UserController.
+        result.perController["UserController"] shouldBe listOf(ep, userDtoPage, userDto)
+        result.perController["AdminController"] shouldBe listOf(adminEp, role)
+        result.shared shouldBe emptyList()
+    }
+
+    @Test
+    fun `flattened generic referenced by two controllers lifts to shared`() {
+        val userEp = endpoint("ListUsers", Reference.Custom("UserDtoPage", false))
+        val adminEp = endpoint("ListByRole", Reference.Custom("UserDtoPage", false))
+        val userDtoPage = typeDef("UserDtoPage", "content" to "UserDto")
+        val userDto = typeDef("UserDto")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf(
+                "UserController" to listOf(userEp),
+                "AdminController" to listOf(adminEp),
+            ),
+            allTypes = listOf(userDtoPage, userDto),
+        )
+
+        // Both flattened wrapper and its transitively-referenced UserDto lift to shared.
+        result.shared shouldBe listOf(userDtoPage, userDto)
+        result.perController["UserController"] shouldBe listOf(userEp)
+        result.perController["AdminController"] shouldBe listOf(adminEp)
+    }
+
+    @Test
+    fun `distinct flattened instantiations are each owned by their using controller`() {
+        // UserController returns UserDtoPage, AdminController returns RoleDtoPage.
+        val userEp = endpoint("ListUsers", Reference.Custom("UserDtoPage", false))
+        val adminEp = endpoint("ListRoles", Reference.Custom("RoleDtoPage", false))
+        val userDtoPage = typeDef("UserDtoPage", "content" to "UserDto")
+        val roleDtoPage = typeDef("RoleDtoPage", "content" to "RoleDto")
+        val userDto = typeDef("UserDto")
+        val roleDto = typeDef("RoleDto")
+
+        val result = TypeOwnership.partition(
+            endpointsByController = mapOf(
+                "UserController" to listOf(userEp),
+                "AdminController" to listOf(adminEp),
+            ),
+            allTypes = listOf(userDtoPage, roleDtoPage, userDto, roleDto),
+        )
+
+        // Each flattened wrapper lives with its using controller, neither shared.
+        result.perController["UserController"] shouldBe listOf(userEp, userDtoPage, userDto)
+        result.perController["AdminController"] shouldBe listOf(adminEp, roleDtoPage, roleDto)
+        result.shared shouldBe emptyList()
+    }
 }
 
 private fun endpoint(name: String, responseRef: Reference?): WsEndpoint = WsEndpoint(

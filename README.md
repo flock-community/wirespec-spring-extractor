@@ -1,7 +1,7 @@
 # wirespec-spring-extractor
 
-[![Maven Central](https://img.shields.io/maven-central/v/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin?label=maven-plugin)](https://central.sonatype.com/artifact/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin)
-[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/community.flock.wirespec.spring.extractor?label=gradle-plugin)](https://plugins.gradle.org/plugin/community.flock.wirespec.spring.extractor)
+[![Maven plugin (Maven Central)](https://img.shields.io/maven-central/v/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin?label=maven-plugin)](https://central.sonatype.com/artifact/community.flock.wirespec.spring/wirespec-spring-extractor-maven-plugin)
+[![Gradle plugin (Maven Central)](https://img.shields.io/maven-central/v/community.flock.wirespec.spring.extractor/community.flock.wirespec.spring.extractor.gradle.plugin?label=gradle-plugin)](https://central.sonatype.com/artifact/community.flock.wirespec.spring.extractor/community.flock.wirespec.spring.extractor.gradle.plugin)
 
 A Maven and Gradle plugin that scans a Spring Boot application's compiled classes and emits
 [Wirespec](https://wirespec.io) (`.ws`) files describing its HTTP endpoints and DTO types.
@@ -17,7 +17,7 @@ auto-binds to `process-classes`:
     <plugin>
       <groupId>community.flock.wirespec.spring</groupId>
       <artifactId>wirespec-spring-extractor-maven-plugin</artifactId>
-      <version>0.1.0</version>
+      <version>0.0.3</version>
       <extensions>true</extensions>
       <configuration>
         <!-- optional — defaults to ${project.build.directory}/wirespec -->
@@ -39,12 +39,30 @@ mvn wirespec:extract
 
 ## Usage (Gradle)
 
+> **Plugin resolution.** The Gradle plugin is published to **Maven Central**,
+> not the Gradle Plugin Portal. Gradle's `plugins { id(...) }` block only checks
+> the Plugin Portal by default, so you must add `mavenCentral()` to plugin
+> resolution. Put this at the **top** of `settings.gradle.kts`, **before** any
+> `include(...)` or `dependencyResolutionManagement {}` block:
+>
+> ```kotlin
+> pluginManagement {
+>     repositories {
+>         mavenCentral()
+>         gradlePluginPortal()
+>     }
+> }
+> ```
+>
+> Without this snippet the build fails with
+> `Plugin [id: 'community.flock.wirespec.spring.extractor', version: '...'] was not found in any of the following sources`.
+
 ### Kotlin project
 
 ```kotlin
 plugins {
     kotlin("jvm") version "2.1.20"
-    id("community.flock.wirespec.spring.extractor") version "0.1.0"
+    id("community.flock.wirespec.spring.extractor") version "0.0.3"
 }
 
 dependencies {
@@ -74,7 +92,7 @@ wirespecExtractor {
 ```kotlin
 plugins {
     java
-    id("community.flock.wirespec.spring.extractor") version "0.1.0"
+    id("community.flock.wirespec.spring.extractor") version "0.0.3"
 }
 
 java {

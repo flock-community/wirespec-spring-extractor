@@ -1,6 +1,7 @@
 // src/main/kotlin/community/flock/wirespec/spring/extractor/ast/WirespecAstBuilder.kt
 package community.flock.wirespec.spring.extractor.ast
 
+import community.flock.wirespec.compiler.core.parse.ast.Channel as WsChannel
 import community.flock.wirespec.compiler.core.parse.ast.Comment
 import community.flock.wirespec.compiler.core.parse.ast.Definition
 import community.flock.wirespec.compiler.core.parse.ast.DefinitionIdentifier
@@ -11,6 +12,7 @@ import community.flock.wirespec.compiler.core.parse.ast.FieldIdentifier
 import community.flock.wirespec.compiler.core.parse.ast.Reference
 import community.flock.wirespec.compiler.core.parse.ast.Refined as WsRefined
 import community.flock.wirespec.compiler.core.parse.ast.Type as WsType
+import community.flock.wirespec.spring.extractor.model.Channel
 import community.flock.wirespec.spring.extractor.model.Endpoint
 import community.flock.wirespec.spring.extractor.model.Endpoint.HttpMethod
 import community.flock.wirespec.spring.extractor.model.Endpoint.PathSegment
@@ -40,6 +42,13 @@ class WirespecAstBuilder {
                 annotations = emptyList(),
             )
         },
+    )
+
+    fun toChannel(c: Channel): WsChannel = WsChannel(
+        comment = null,
+        annotations = emptyList(),
+        identifier = DefinitionIdentifier(c.name),
+        reference = toReference(c.payload),
     )
 
     fun toDefinition(wt: WireType): Definition = when (wt) {

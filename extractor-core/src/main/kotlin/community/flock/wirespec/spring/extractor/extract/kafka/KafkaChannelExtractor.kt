@@ -33,6 +33,25 @@ internal class KafkaChannelExtractor(
             }
         }
 
+    /** Build channels from producer (send) sites. */
+    fun fromProducerSites(sites: List<KafkaProducerBytecodeWalker.ProducerSite>): List<Channel> {
+        // Multiple sites with the same (ownerClass, enclosingMethod, valueClass)
+        // were already collapsed by the walker; if the same enclosing method
+        // produces different valueClasses, disambiguate via TypeSimpleName suffix.
+        val byMethodKey = sites.groupBy { Triple(it.ownerClass, it.enclosingMethod, it.valueClass) }
+            .keys.toList()
+        val methodCounts = byMethodKey.groupingBy { it.first to it.second }.eachCount()
+        return byMethodKey.map { (owner, methodName, valueClass) ->
+            val base = pascalCase(methodName)
+            val name = if ((methodCounts[owner to methodName] ?: 0) > 1) "${base}_${valueClass.simpleName}" else base
+            Channel(
+                ownerSimpleName = owner.simpleName,
+                name = name,
+                payload = types.extract(valueClass),
+            )
+        }
+    }
+
     private fun pascalCase(name: String): String =
         if (name.isEmpty()) name else name[0].uppercaseChar() + name.substring(1)
 }

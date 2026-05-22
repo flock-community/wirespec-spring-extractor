@@ -11,6 +11,8 @@ import community.flock.wirespec.spring.extractor.extract.dsl.DslEndpointExtracto
 import community.flock.wirespec.spring.extractor.extract.dsl.DslRouteScanner
 import community.flock.wirespec.spring.extractor.extract.kafka.KafkaChannelExtractor
 import community.flock.wirespec.spring.extractor.extract.kafka.KafkaListenerScanner
+import community.flock.wirespec.spring.extractor.extract.kafka.KafkaProducerBytecodeWalker
+import community.flock.wirespec.spring.extractor.extract.kafka.KafkaProducerScanner
 import community.flock.wirespec.spring.extractor.ownership.TypeOwnership
 import community.flock.wirespec.spring.extractor.scan.ControllerScanner
 import java.io.File
@@ -116,6 +118,26 @@ object WirespecExtractor {
             val kafkaExtractor = KafkaChannelExtractor(types, onWarn = { msg -> config.log.warn(msg) })
             val consumerChannels = kafkaExtractor.fromListenerSites(listenerSites)
             for (channel in consumerChannels) {
+                val ws = builder.toChannel(channel)
+                val key = channel.ownerSimpleName
+                val existing = byController[key].orEmpty()
+                byController[key] = existing + (ws as Definition)
+            }
+
+            // -- Kafka producers --------------------------------------------------
+            val templateFields = KafkaProducerScanner.scan(
+                loader, scanPackages, effectiveBasePackage,
+                onWarn = { msg -> config.log.warn(msg) },
+            )
+            if (templateFields.isNotEmpty()) {
+                config.log.info("Found ${templateFields.size} KafkaTemplate field(s)")
+            }
+            val producerOwners = templateFields.map { it.ownerClass }.distinct()
+            val producerSites = producerOwners.flatMap { owner ->
+                KafkaProducerBytecodeWalker.walk(owner, templateFields, onWarn = { msg -> config.log.warn(msg) })
+            }
+            val producerChannels = kafkaExtractor.fromProducerSites(producerSites)
+            for (channel in producerChannels) {
                 val ws = builder.toChannel(channel)
                 val key = channel.ownerSimpleName
                 val existing = byController[key].orEmpty()

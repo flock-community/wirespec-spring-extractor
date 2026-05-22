@@ -1,5 +1,6 @@
 package community.flock.wirespec.spring.extractor.ownership
 
+import community.flock.wirespec.compiler.core.parse.ast.Channel as WsChannel
 import community.flock.wirespec.compiler.core.parse.ast.Definition
 import community.flock.wirespec.compiler.core.parse.ast.Endpoint as WsEndpoint
 import community.flock.wirespec.compiler.core.parse.ast.Reference
@@ -41,6 +42,11 @@ internal object TypeOwnership {
             val frontier = ArrayDeque<String>()
             defs.filterIsInstance<WsEndpoint>().forEach { ep ->
                 customNamesIn(ep).forEach { name ->
+                    if (visited.add(name)) frontier += name
+                }
+            }
+            defs.filterIsInstance<WsChannel>().forEach { ch ->
+                customNamesIn(ch).forEach { name ->
                     if (visited.add(name)) frontier += name
                 }
             }
@@ -112,6 +118,10 @@ internal object TypeOwnership {
         }
         return out
     }
+
+    /** Names of every `Reference.Custom` reachable from a channel's payload reference. */
+    internal fun customNamesIn(channel: WsChannel): Set<String> =
+        customNamesIn(channel.reference).toSet()
 
     /** Names of every `Reference.Custom` reachable from a Type's shape fields and extends list. */
     internal fun customNamesIn(type: WsType): Set<String> {

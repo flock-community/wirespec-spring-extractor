@@ -21,7 +21,10 @@ object KafkaFixtureVerifier {
         val consumer = File(wsDir, "OrderConsumer.ws").readText()
 
         consumer shouldContain "channel OnOrderCreated -> OrderEvent"
-        // Payload DTO is owned by the only file that references it.
+        consumer shouldContain "channel OnOrderRecord -> OrderEvent"
+        consumer shouldContain "channel OnOrderMessage -> OrderEvent"
+        consumer shouldContain "channel OnOrderBatch -> OrderEvent"
+        consumer shouldContain "channel OnOrderWithHeader -> OrderEvent"
         consumer shouldContain "type OrderEvent"
     }
 }

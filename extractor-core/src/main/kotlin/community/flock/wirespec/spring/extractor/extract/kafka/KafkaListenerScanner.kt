@@ -62,6 +62,23 @@ internal object KafkaListenerScanner {
                     methodSites += Site(cls, method)
                 }
             }
+
+            val classLevel = result.getClassesWithAnnotation(KAFKA_LISTENER_ANNOTATION)
+                .filter { ci -> FRAMEWORK_EXCLUSIONS.none { ci.name.startsWith("$it.") } }
+                .filter { ci -> basePackage == null || ci.name.startsWith("$basePackage.") || ci.name == basePackage }
+            for (ci in classLevel) {
+                val cls = try { ci.loadClass() } catch (t: Throwable) {
+                    onWarn("kafka.consumer: skipping ${ci.name}: ${t.message}")
+                    continue
+                }
+                for (mi in ci.methodInfo) {
+                    if (!mi.hasAnnotation(KAFKA_HANDLER_ANNOTATION)) continue
+                    val method = cls.declaredMethods.firstOrNull {
+                        it.name == mi.name && it.parameterCount == mi.parameterInfo.size
+                    } ?: continue
+                    methodSites += Site(cls, method)
+                }
+            }
             return methodSites
         }
     }

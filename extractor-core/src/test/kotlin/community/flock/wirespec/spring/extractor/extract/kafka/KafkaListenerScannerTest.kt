@@ -32,4 +32,27 @@ class KafkaListenerScannerTest {
         ours shouldHaveSize 2
         ours.map { it.method.name }.toSet() shouldBe setOf("onCreated", "onUpdated")
     }
+
+    @org.springframework.kafka.annotation.KafkaListener(topics = ["shipments"])
+    @Suppress("unused")
+    class ShipmentRouter {
+        @org.springframework.kafka.annotation.KafkaHandler
+        fun onCreated(event: Order) {}
+
+        @org.springframework.kafka.annotation.KafkaHandler
+        fun onUpdated(event: Order) {}
+    }
+
+    @Test
+    fun `discovers @KafkaHandler methods under class-level @KafkaListener`() {
+        val loader = javaClass.classLoader
+        val sites = KafkaListenerScanner.scan(
+            classLoader = loader,
+            scanPackages = listOf("community.flock.wirespec.spring.extractor.extract.kafka"),
+            basePackage = null,
+        )
+        val ours = sites.filter { it.ownerClass == ShipmentRouter::class.java }
+        ours shouldHaveSize 2
+        ours.map { it.method.name }.toSet() shouldBe setOf("onCreated", "onUpdated")
+    }
 }

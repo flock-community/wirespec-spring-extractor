@@ -55,6 +55,9 @@ dependencies {
     testImplementation(libs.spring.rabbit)
     testImplementation(libs.spring.pulsar)
     testImplementation(libs.spring.integration.core)
+    // spring-jms declares jakarta.jms-api as optional, so it must be added
+    // explicitly for tests that reference jakarta.jms.* types directly.
+    testImplementation(libs.jakarta.jms.api)
 }
 
 tasks.test {
